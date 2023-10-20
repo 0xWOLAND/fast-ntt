@@ -7,3 +7,4 @@ edition = "2021"
 
 [dependencies]
 mod_exp = "1.0.1"
+rand = "0.8.5"

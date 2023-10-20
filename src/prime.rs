@@ -1,6 +1,6 @@
 use mod_exp::mod_exp;
 
-fn check_composite(n: u64, a: u64, d: u64, s: u64) -> bool {
+fn check_composite(n: i64, a: i64, d: i64, s: i64) -> bool {
     let mut x = mod_exp(a, d, n);
     if x == 1 || x == n - 1 {
         return false;
@@ -14,7 +14,7 @@ fn check_composite(n: u64, a: u64, d: u64, s: u64) -> bool {
     return true;
 }
 
-pub fn is_prime(n: u64) -> bool {
+pub fn is_prime(n: i64) -> bool {
     if n < 4 {
         return n == 2 || n == 3;
     }
