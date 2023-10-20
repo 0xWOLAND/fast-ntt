@@ -2,10 +2,11 @@ use crate::prime::is_prime;
 use mod_exp::mod_exp;
 use std::mem::swap;
 
+#[derive(Debug, Clone)]
 pub struct Constants {
-    k: i64,
-    N: i64,
-    w: i64,
+    pub k: i64,
+    pub N: i64,
+    pub w: i64,
 }
 
 fn gcd(a: i64, b: i64) -> i64 {
@@ -56,7 +57,25 @@ fn extended_gcd(a: i64, b: i64) -> i64 {
     (t2 + n) % n
 }
 
-fn working_modulus(n: i64, M: i64) -> Constants {
+fn prime_factors(a: i64) -> Vec<i64> {
+    let mut ans: Vec<i64> = Vec::new();
+    (2..(((a as f64).sqrt() + 1.) as i64)).for_each(|x| {
+        if a % x == 0 {
+            ans.push(x);
+        }
+    });
+    ans
+}
+
+fn is_primitive_root(a: i64, deg: i64, N: i64) -> bool {
+    mod_exp(a, deg, N) == 1
+        && prime_factors(deg)
+            .iter()
+            .map(|&x| mod_exp(a, deg / x, N) != 1)
+            .all(|x| x)
+}
+
+pub fn working_modulus(n: i64, M: i64) -> Constants {
     let mut N = n + 1;
     let mut k = 1;
     while (!is_prime(N)) || N < M {
@@ -65,7 +84,7 @@ fn working_modulus(n: i64, M: i64) -> Constants {
     }
     let mut gen = 0;
     for g in 2..N {
-        if gcd(g, N) == 1 {
+        if is_primitive_root(g, N - 1, N) {
             gen = g;
             break;
         }
@@ -102,11 +121,15 @@ pub fn inverse(inp: Vec<i64>, c: &Constants) -> Vec<i64> {
 
 #[cfg(test)]
 mod tests {
+    use rand::Rng;
+
     use crate::ntt::{extended_gcd, forward, gcd, inverse, working_modulus, Constants};
     #[test]
     fn test_forward() {
-        let v: Vec<i64> = vec![6, 0, 10, 7, 2];
-        let n = v.len() as i64;
+        let n = rand::thread_rng().gen::<i64>().abs() % 10;
+        let v: Vec<i64> = (0..n)
+            .map(|_| rand::thread_rng().gen::<i64>().abs() % (1 << 6))
+            .collect();
         let M = v.iter().max().unwrap().pow(2) as i64 * n + 1;
         let c = working_modulus(n, M);
         let forward = forward(v.clone(), &c);
