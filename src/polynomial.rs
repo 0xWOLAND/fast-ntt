@@ -12,6 +12,19 @@ pub struct Polynomial {
     pub coef: Vec<i64>,
 }
 
+impl Polynomial {
+    pub fn diff(mut self) -> Self {
+        let N = self.coef.len();
+        for n in (1..N).rev() {
+            self.coef[n] = self.coef[n - 1] * ((N - n) as i64);
+        }
+        self.coef[0] = 0;
+        self.coef = self.coef[1..].to_vec();
+
+        self
+    }
+}
+
 impl Add<Polynomial> for Polynomial {
     type Output = Polynomial;
 
@@ -138,5 +151,14 @@ mod tests {
             coef: vec![1, -5, 4, -8],
         };
         println!("{:?}", a * b);
+    }
+
+    #[test]
+    fn diff() {
+        let a = Polynomial {
+            coef: vec![3, 2, 1],
+        };
+        let da = a.diff();
+        println!("{:?}", da);
     }
 }
