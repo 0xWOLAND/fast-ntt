@@ -140,7 +140,6 @@ mod tests {
     fn test_extended_gcd() {
         (2..11).for_each(|x| {
             let inv = extended_gcd(x, 11);
-            println!("{} {}", x, inv);
             assert_eq!((x * inv) % 11, 1);
         });
     }

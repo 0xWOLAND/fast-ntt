@@ -80,7 +80,6 @@ impl Mul<Polynomial> for Polynomial {
             * n
             + 1;
         let c = working_modulus(n, M);
-        println!("consts -- {} {:?}", M, c);
 
         v1.iter_mut().for_each(|x| {
             if *x < 0 {
@@ -92,9 +91,6 @@ impl Mul<Polynomial> for Polynomial {
                 *x = (*x).rem_euclid(M)
             }
         });
-
-        println!("v1 -- {:?}", v1);
-        println!("v2 -- {:?}", v2);
 
         let a_forward = forward(v1, &c);
         let b_forward = forward(v2, &c);
@@ -111,7 +107,6 @@ impl Mul<Polynomial> for Polynomial {
                 Right(_) => {}
             });
         mul.reverse();
-        let coef = inverse(mul.clone(), &c);
         let coef = inverse(mul, &c)
             .iter()
             .map(|&x| if x > M / 2 { -(M - x.rem_euclid(M)) } else { x })
