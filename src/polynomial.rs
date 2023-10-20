@@ -1,4 +1,7 @@
-use std::ops::{Add, Mul, Neg, Sub};
+use std::{
+    mem::swap,
+    ops::{Add, Mul, Neg, Sub},
+};
 
 use itertools::{EitherOrBoth::*, Itertools};
 
@@ -52,15 +55,21 @@ impl Mul<Polynomial> for Polynomial {
     type Output = Polynomial;
 
     fn mul(self, rhs: Polynomial) -> Self::Output {
-        let n = self.coef.len() as i64;
-        let M = self.coef.iter().max().unwrap().pow(2) as i64 * n + 1;
-        let c = working_modulus(n, M);
-        println!("consts -- {:?} {}", c, M);
-        let a_forward = forward(self.coef, &c);
-        let b_forward = forward(rhs.coef, &c);
+        let mut v1 = self.coef;
+        let mut v2 = rhs.coef;
+        let n = v1.len().max(v2.len()) as i64;
+        if v1.len() > v2.len() {
+            swap(&mut v1, &mut v2);
+        }
+        v1 = vec![0; (n - v1.len() as i64) as usize]
+            .into_iter()
+            .chain(v1.into_iter())
+            .collect();
 
-        println!("a -- {:?}", a_forward);
-        println!("b -- {:?}", b_forward);
+        let M = v1.iter().max().unwrap().pow(2) as i64 * n + 1;
+        let c = working_modulus(n, M);
+        let a_forward = forward(v1, &c);
+        let b_forward = forward(v2, &c);
 
         let mul = a_forward
             .iter()
@@ -73,7 +82,6 @@ impl Mul<Polynomial> for Polynomial {
             })
             .rev()
             .collect::<Vec<i64>>();
-        println!("mul -- {:?}", mul);
         Polynomial {
             coef: inverse(mul, &c),
         }
@@ -96,7 +104,7 @@ mod tests {
     #[test]
     fn mul() {
         let a = Polynomial { coef: vec![1, 2] };
-        let b = Polynomial { coef: vec![0, 1] };
+        let b = Polynomial { coef: vec![1] };
         println!("{:?}", a * b);
     }
 }
