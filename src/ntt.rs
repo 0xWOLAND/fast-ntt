@@ -10,23 +10,6 @@ pub struct Constants {
     pub w: i64,
 }
 
-fn gcd(a: i64, b: i64) -> i64 {
-    let mut a = a;
-    let mut b = b;
-
-    if a < b {
-        swap(&mut a, &mut b);
-    }
-    if a % b == 0 {
-        return b;
-    }
-    while b > 0 {
-        a = a % b;
-        swap(&mut a, &mut b);
-    }
-    a
-}
-
 fn extended_gcd(a: i64, b: i64) -> i64 {
     let mut a = a;
     let mut b = b;
@@ -95,25 +78,50 @@ pub fn working_modulus(n: i64, M: i64) -> Constants {
     Constants { k, N, w }
 }
 
-pub fn forward(inp: Vec<i64>, c: &Constants) -> Vec<i64> {
-    let mut pre = vec![-1; inp.len().pow(2)];
-    (0..inp.len()).for_each(|col| {
-        (0..=col).for_each(|row| {
-            if pre[row * inp.len() + col] == -1 {
-                pre[row * inp.len() + col] = mod_exp(c.w, (row * col) as i64, c.N) as i64;
-            }
-        })
-    });
+fn order_reverse(inp: &mut Vec<i64>) {
+    let mut j = 0;
+    let n = inp.len();
+    (1..n).for_each(|i| {
+        let mut bit = n >> 1;
+        while (j & bit) > 0 {
+            j ^= bit;
+            bit >>= 1;
+        }
+        j ^= bit;
 
-    (0..inp.len())
-        .map(|k| {
-            inp.iter().enumerate().fold(0, |acc, (i, cur)| {
-                let row = k.min(i);
-                let col = k.max(i);
-                (acc + cur * pre[row * inp.len() + col]) % c.N as i64
-            }) % c.N as i64
-        })
-        .collect()
+        if i < j {
+            inp.swap(i, j);
+        }
+    });
+}
+
+pub fn forward(inp: Vec<i64>, c: &Constants) -> Vec<i64> {
+    let mut inp = inp.clone();
+    let N = inp.len();
+    let mut pre = vec![1; N / 2];
+
+    (1..N / 2).for_each(|i| pre[i] = (pre[i - 1] * c.w).rem_euclid(c.N));
+    order_reverse(&mut inp);
+
+    let mut len = 2;
+
+    while len <= N {
+        let half = len / 2;
+        let pre_step = N / len;
+        (0..N).step_by(len).for_each(|i| {
+            let mut k = 0;
+            (i..i + half).for_each(|j| {
+                let l = j + half;
+                let left = inp[j];
+                let right = inp[l] * pre[k];
+                inp[j] = (left + right).rem_euclid(c.N);
+                inp[l] = (left - right).rem_euclid(c.N);
+                k += pre_step;
+            })
+        });
+        len <<= 1;
+    }
+    inp
 }
 
 pub fn inverse(inp: Vec<i64>, c: &Constants) -> Vec<i64> {
@@ -146,10 +154,12 @@ pub fn inverse(inp: Vec<i64>, c: &Constants) -> Vec<i64> {
 mod tests {
     use rand::Rng;
 
-    use crate::ntt::{extended_gcd, forward, gcd, inverse, working_modulus, Constants};
+    use crate::ntt::{extended_gcd, forward, inverse, working_modulus, Constants};
+
     #[test]
     fn test_forward() {
-        let n = rand::thread_rng().gen::<i64>().abs() % 10;
+        // let n = rand::thread_rng().gen::<i64>().abs() % 10;
+        let n = 8;
         let v: Vec<i64> = (0..n)
             .map(|_| rand::thread_rng().gen::<i64>().abs() % (1 << 6))
             .collect();
@@ -165,10 +175,5 @@ mod tests {
             let inv = extended_gcd(x, 11);
             assert_eq!((x * inv) % 11, 1);
         });
-    }
-    #[test]
-    fn test_gcd() {
-        assert_eq!(gcd(10, 5), 5);
-        assert_eq!(gcd(10, 7), 1);
     }
 }

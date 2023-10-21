@@ -13,6 +13,21 @@ pub struct Polynomial {
 }
 
 impl Polynomial {
+    pub fn new(coef: Vec<i64>) -> Self {
+        let n = coef.len();
+
+        // if is not power of 2
+        if !(n & (n - 1) == 0) {
+            let pad = n.next_power_of_two() - n;
+            return Self {
+                coef: vec![0; pad]
+                    .into_iter()
+                    .chain(coef.into_iter())
+                    .collect_vec(),
+            };
+        }
+        Self { coef }
+    }
     pub fn diff(mut self) -> Self {
         let N = self.coef.len();
         for n in (1..N).rev() {
@@ -70,7 +85,7 @@ impl Mul<Polynomial> for Polynomial {
     fn mul(self, rhs: Polynomial) -> Self::Output {
         let mut v1 = self.coef;
         let mut v2 = rhs.coef;
-        let n = (v1.len() + v2.len()) as i64;
+        let n = (v1.len() + v2.len()).next_power_of_two() as i64;
         let v1_deg = v1.len() - 1;
         let v2_deg = v2.len() - 1;
 
@@ -123,9 +138,13 @@ impl Mul<Polynomial> for Polynomial {
         let coef = inverse(mul, &c)
             .iter()
             .map(|&x| if x > M / 2 { -(M - x.rem_euclid(M)) } else { x })
-            .collect::<Vec<i64>>()[..=(v1_deg + v2_deg)]
+            .collect::<Vec<i64>>()
             .to_vec();
-        Polynomial { coef }
+        let start = coef.iter().position(|&x| x != 0).unwrap();
+
+        Polynomial {
+            coef: coef[start..(start + v1_deg + v2_deg)].to_vec(),
+        }
     }
 }
 
@@ -135,29 +154,21 @@ mod tests {
 
     #[test]
     fn add() {
-        let a = Polynomial {
-            coef: vec![1, 2, 3, 4],
-        };
-        let b = Polynomial { coef: vec![1, 2] };
+        let a = Polynomial::new(vec![1, 2, 3, 4]);
+        let b = Polynomial::new(vec![1, 2]);
         println!("{:?}", a + b);
     }
 
     #[test]
     fn mul() {
-        let a = Polynomial {
-            coef: vec![1, 2, -3],
-        };
-        let b = Polynomial {
-            coef: vec![1, -5, 4, -8],
-        };
+        let a = Polynomial::new(vec![1, -2, 3]);
+        let b = Polynomial::new(vec![1, -3]);
         println!("{:?}", a * b);
     }
 
     #[test]
     fn diff() {
-        let a = Polynomial {
-            coef: vec![3, 2, 1],
-        };
+        let a = Polynomial::new(vec![3, 2, 1]);
         let da = a.diff();
         println!("{:?}", da);
     }
