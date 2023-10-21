@@ -1,5 +1,6 @@
 use crate::prime::is_prime;
 use core::panic;
+use itertools::Itertools;
 use mod_exp::mod_exp;
 use std::mem::swap;
 
@@ -128,26 +129,33 @@ pub fn inverse(inp: Vec<i64>, c: &Constants) -> Vec<i64> {
     let inv = extended_gcd(inp.len() as i64, c.N);
     let w = extended_gcd(c.w, c.N);
 
-    let mut pre = vec![-1; inp.len().pow(2)];
-    (0..inp.len()).for_each(|col| {
-        (0..=col).for_each(|row| {
-            if pre[row * inp.len() + col] == -1 {
-                pre[row * inp.len() + col] = mod_exp(w, (row * col) as i64, c.N) as i64;
-            }
-        })
-    });
+    let mut inp = inp.clone();
+    let N = inp.len();
+    let mut pre = vec![1; N / 2];
 
-    (0..inp.len())
-        .map(|k| {
-            inv as i64
-                * inp.iter().enumerate().fold(0, |acc, (i, cur)| {
-                    let row = k.min(i);
-                    let col = k.max(i);
-                    (acc + cur * pre[row * inp.len() + col]) % c.N as i64
-                })
-                % c.N as i64
-        })
-        .collect()
+    (1..N / 2).for_each(|i| pre[i] = (pre[i - 1] * w).rem_euclid(c.N));
+    order_reverse(&mut inp);
+
+    let mut len = 2;
+
+    while len <= N {
+        let half = len / 2;
+        let pre_step = N / len;
+        (0..N).step_by(len).for_each(|i| {
+            let mut k = 0;
+            (i..i + half).for_each(|j| {
+                let l = j + half;
+                let left = inp[j];
+                let right = inp[l] * pre[k];
+                inp[j] = (left + right).rem_euclid(c.N);
+                inp[l] = (left - right).rem_euclid(c.N);
+                k += pre_step;
+            })
+        });
+        len <<= 1;
+    }
+
+    inp.iter().map(|x| (inv * x).rem_euclid(c.N)).collect_vec()
 }
 
 #[cfg(test)]
@@ -158,8 +166,7 @@ mod tests {
 
     #[test]
     fn test_forward() {
-        // let n = rand::thread_rng().gen::<i64>().abs() % 10;
-        let n = 8;
+        let n = rand::thread_rng().gen::<i64>().abs() % 10;
         let v: Vec<i64> = (0..n)
             .map(|_| rand::thread_rng().gen::<i64>().abs() % (1 << 6))
             .collect();
