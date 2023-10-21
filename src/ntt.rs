@@ -96,39 +96,7 @@ fn order_reverse(inp: &mut Vec<i64>) {
     });
 }
 
-pub fn forward(inp: Vec<i64>, c: &Constants) -> Vec<i64> {
-    let mut inp = inp.clone();
-    let N = inp.len();
-    let mut pre = vec![1; N / 2];
-
-    (1..N / 2).for_each(|i| pre[i] = (pre[i - 1] * c.w).rem_euclid(c.N));
-    order_reverse(&mut inp);
-
-    let mut len = 2;
-
-    while len <= N {
-        let half = len / 2;
-        let pre_step = N / len;
-        (0..N).step_by(len).for_each(|i| {
-            let mut k = 0;
-            (i..i + half).for_each(|j| {
-                let l = j + half;
-                let left = inp[j];
-                let right = inp[l] * pre[k];
-                inp[j] = (left + right).rem_euclid(c.N);
-                inp[l] = (left - right).rem_euclid(c.N);
-                k += pre_step;
-            })
-        });
-        len <<= 1;
-    }
-    inp
-}
-
-pub fn inverse(inp: Vec<i64>, c: &Constants) -> Vec<i64> {
-    let inv = extended_gcd(inp.len() as i64, c.N);
-    let w = extended_gcd(c.w, c.N);
-
+fn fft(inp: Vec<i64>, c: &Constants, w: i64) -> Vec<i64> {
     let mut inp = inp.clone();
     let N = inp.len();
     let mut pre = vec![1; N / 2];
@@ -154,8 +122,21 @@ pub fn inverse(inp: Vec<i64>, c: &Constants) -> Vec<i64> {
         });
         len <<= 1;
     }
+    inp
+}
 
-    inp.iter().map(|x| (inv * x).rem_euclid(c.N)).collect_vec()
+pub fn forward(inp: Vec<i64>, c: &Constants) -> Vec<i64> {
+    fft(inp, c, c.w)
+}
+
+pub fn inverse(inp: Vec<i64>, c: &Constants) -> Vec<i64> {
+    let inv = extended_gcd(inp.len() as i64, c.N);
+    let w = extended_gcd(c.w, c.N);
+
+    fft(inp, c, w)
+        .iter()
+        .map(|&x| (inv * x).rem_euclid(c.N))
+        .collect_vec()
 }
 
 #[cfg(test)]
