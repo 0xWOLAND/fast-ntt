@@ -7,7 +7,7 @@ use std::{
     },
 };
 
-use crypto_bigint::{Invert, NonZero, Wrapping, U128, U256};
+use crypto_bigint::{Invert, NonZero, Wrapping, U256};
 use itertools::Itertools;
 
 pub enum BigIntType {
@@ -62,6 +62,18 @@ impl BigInt {
     pub fn sqrt(&self) -> BigInt {
         BigInt {
             v: self.v.sqrt_vartime(),
+        }
+    }
+
+    pub fn add_mod(&self, rhs: BigInt, M: BigInt) -> BigInt {
+        (*self + rhs).rem(M)
+    }
+
+    pub fn sub_mod(&self, rhs: BigInt, M: BigInt) -> BigInt {
+        if rhs > *self {
+            M - (rhs - *self).rem(M)
+        } else {
+            (*self - rhs).rem(M)
         }
     }
 }
@@ -527,7 +539,7 @@ impl Display for BigInt {
         let mut trimmed = str.trim_start_matches('0').to_string();
 
         // in case the string is "0000"
-        if str.ends_with('0') {
+        if str.chars().all(|x| x == '0') {
             trimmed = "0".to_string();
         }
 
@@ -558,5 +570,26 @@ mod tests {
         let a = BigInt::from(8);
         let b = BigInt::from(10);
         println!("{}", a / b);
+    }
+
+    #[test]
+    fn test_rem() {
+        let a = BigInt::from(10);
+        println!("{}", a.rem(BigInt::from(4)));
+    }
+
+    #[test]
+    fn test_display() {
+        let a = BigInt::from(111);
+        println!("{}", a);
+    }
+
+    #[test]
+    fn test_add_mod() {
+        let a = BigInt::from(72);
+        let b = BigInt::from(1890);
+        let N = BigInt::from(73);
+
+        println!("{}", a.sub_mod(b, N));
     }
 }

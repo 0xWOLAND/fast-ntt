@@ -1,6 +1,5 @@
 use crate::{numbers::BigInt, prime::is_prime};
 use itertools::Itertools;
-use mod_exp::mod_exp;
 
 #[derive(Debug, Clone)]
 pub struct Constants {
@@ -53,11 +52,11 @@ fn prime_factors(a: BigInt) -> Vec<BigInt> {
 }
 
 fn is_primitive_root(a: BigInt, deg: BigInt, N: BigInt) -> bool {
-    let lhs = a.mod_exp(deg, N) == 1;
-    let pf = prime_factors(deg);
-    let rhs: Vec<bool> = pf.iter().map(|&x| a.mod_exp(deg / x, N) != 1).collect();
-    // .all(|x| x);
-    lhs && rhs.iter().all(|&x| x)
+    a.mod_exp(deg, N) == 1
+        && prime_factors(deg)
+            .iter()
+            .map(|&x| a.mod_exp(deg / x, N) != 1)
+            .all(|x| x)
 }
 
 pub fn working_modulus(n: BigInt, M: BigInt) -> Constants {
@@ -117,8 +116,8 @@ fn fft(inp: Vec<BigInt>, c: &Constants, w: BigInt) -> Vec<BigInt> {
                 let l = j + half;
                 let left = inp[j];
                 let right = inp[l] * pre[k];
-                inp[j] = (left + right).rem(BigInt::from(c.N));
-                inp[l] = (left - right).rem(BigInt::from(c.N));
+                inp[j] = left.add_mod(right, BigInt::from(c.N));
+                inp[l] = left.sub_mod(right, BigInt::from(c.N));
                 k += pre_step;
             })
         });
@@ -146,15 +145,15 @@ mod tests {
     use rand::Rng;
 
     use crate::{
-        ntt::{extended_gcd, forward, inverse, working_modulus, Constants},
+        ntt::{extended_gcd, forward, inverse, working_modulus},
         numbers::BigInt,
     };
 
     #[test]
     fn test_forward() {
-        let n = rand::thread_rng().gen::<i32>().abs() % 10;
+        let n = 1 << rand::thread_rng().gen::<u32>() % 8;
         let v: Vec<BigInt> = (0..n)
-            .map(|_| BigInt::from(rand::thread_rng().gen::<i32>().abs() % (1 << 6)))
+            .map(|_| BigInt::from(rand::thread_rng().gen::<u32>() % (1 << 6)))
             .collect();
         let M = (*v.iter().max().unwrap() << 1) * BigInt::from(n) + 1;
         let c = working_modulus(BigInt::from(n), BigInt::from(M));

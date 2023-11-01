@@ -1,6 +1,5 @@
 use std::{
     fmt::Display,
-    mem::swap,
     ops::{Add, Mul, Neg, Sub},
 };
 
@@ -30,7 +29,7 @@ impl Polynomial {
         Self { coef }
     }
     pub fn diff(mut self) -> Self {
-        let N = self.coef.len();
+        let N = self.len();
         for n in (1..N).rev() {
             self.coef[n] = self.coef[n - 1] * BigInt::from(N - n);
         }
@@ -39,6 +38,15 @@ impl Polynomial {
         self.coef = self.coef[start..].to_vec();
 
         self
+    }
+
+    pub fn len(&self) -> usize {
+        self.coef.len()
+    }
+
+    pub fn degree(&self) -> usize {
+        let start = self.coef.iter().position(|&x| x != 0).unwrap();
+        self.len() - start - 1
     }
 }
 
@@ -85,11 +93,11 @@ impl Mul<Polynomial> for Polynomial {
     type Output = Polynomial;
 
     fn mul(self, rhs: Polynomial) -> Self::Output {
+        let v1_deg = self.degree();
+        let v2_deg = rhs.degree();
         let mut v1 = self.coef;
         let mut v2 = rhs.coef;
         let n = (v1.len() + v2.len()).next_power_of_two();
-        let v1_deg = v1.len() - 1;
-        let v2_deg = v2.len() - 1;
 
         v1 = vec![BigInt::from(0); n - v1.len()]
             .into_iter()
@@ -123,7 +131,7 @@ impl Mul<Polynomial> for Polynomial {
         let start = coef.iter().position(|&x| x != 0).unwrap();
 
         Polynomial {
-            coef: coef[start..(start + v1_deg + v2_deg)].to_vec(),
+            coef: coef[start..=(start + v1_deg + v2_deg)].to_vec(),
         }
     }
 }
@@ -148,8 +156,13 @@ mod tests {
 
     #[test]
     fn mul() {
-        let a = Polynomial::new(vec![1, 2].iter().map(|&x| BigInt::from(x)).collect());
-        let b = Polynomial::new(vec![1, 2].iter().map(|&x| BigInt::from(x)).collect());
+        let a = Polynomial::new(vec![1, 2, 3].iter().map(|&x| BigInt::from(x)).collect());
+        let b = Polynomial::new(
+            vec![1, 2, 3, 4, 5, 6, 7, 8, 9]
+                .iter()
+                .map(|&x| BigInt::from(x))
+                .collect(),
+        );
         println!("{}", a * b);
     }
 

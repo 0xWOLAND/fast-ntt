@@ -1,5 +1,3 @@
-use mod_exp::mod_exp;
-
 use crate::numbers::BigInt;
 
 fn check_composite(n: BigInt, a: BigInt, d: BigInt, s: BigInt) -> bool {
