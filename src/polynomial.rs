@@ -1,26 +1,26 @@
 use std::{
-    mem::swap,
+    fmt::Display,
     ops::{Add, Mul, Neg, Sub},
 };
 
 use itertools::{EitherOrBoth::*, Itertools};
 
-use crate::ntt::*;
+use crate::{ntt::*, numbers::BigInt};
 
 #[derive(Debug, Clone)]
 pub struct Polynomial {
-    pub coef: Vec<i64>,
+    pub coef: Vec<BigInt>,
 }
 
 impl Polynomial {
-    pub fn new(coef: Vec<i64>) -> Self {
+    pub fn new(coef: Vec<BigInt>) -> Self {
         let n = coef.len();
 
         // if is not power of 2
         if !(n & (n - 1) == 0) {
             let pad = n.next_power_of_two() - n;
             return Self {
-                coef: vec![0; pad]
+                coef: vec![BigInt::from(0); pad]
                     .into_iter()
                     .chain(coef.into_iter())
                     .collect_vec(),
@@ -29,14 +29,24 @@ impl Polynomial {
         Self { coef }
     }
     pub fn diff(mut self) -> Self {
-        let N = self.coef.len();
+        let N = self.len();
         for n in (1..N).rev() {
-            self.coef[n] = self.coef[n - 1] * ((N - n) as i64);
+            self.coef[n] = self.coef[n - 1] * BigInt::from(N - n);
         }
-        self.coef[0] = 0;
-        self.coef = self.coef[1..].to_vec();
+        self.coef[0] = BigInt::from(0);
+        let start = self.coef.iter().position(|&x| x != 0).unwrap();
+        self.coef = self.coef[start..].to_vec();
 
         self
+    }
+
+    pub fn len(&self) -> usize {
+        self.coef.len()
+    }
+
+    pub fn degree(&self) -> usize {
+        let start = self.coef.iter().position(|&x| x != 0).unwrap();
+        self.len() - start - 1
     }
 }
 
@@ -74,7 +84,7 @@ impl Neg for Polynomial {
 
     fn neg(self) -> Self::Output {
         Polynomial {
-            coef: self.coef.iter().map(|a| -a).collect(),
+            coef: self.coef.iter().map(|a| -(*a)).collect(),
         }
     }
 }
@@ -83,93 +93,83 @@ impl Mul<Polynomial> for Polynomial {
     type Output = Polynomial;
 
     fn mul(self, rhs: Polynomial) -> Self::Output {
+        let v1_deg = self.degree();
+        let v2_deg = rhs.degree();
         let mut v1 = self.coef;
         let mut v2 = rhs.coef;
-        let n = (v1.len() + v2.len()).next_power_of_two() as i64;
-        let v1_deg = v1.len() - 1;
-        let v2_deg = v2.len() - 1;
+        let n = (v1.len() + v2.len()).next_power_of_two();
 
-        v1 = vec![0; (n - v1.len() as i64) as usize]
+        v1 = vec![BigInt::from(0); n - v1.len()]
             .into_iter()
             .chain(v1.into_iter())
             .collect();
-        v2 = vec![0; (n - v2.len() as i64) as usize]
+        v2 = vec![BigInt::from(0); n - v2.len()]
             .into_iter()
             .chain(v2.into_iter())
             .collect();
 
-        let M = v1
-            .iter()
-            .map(|x| x.abs())
-            .max()
-            .unwrap()
-            .max(v2.iter().map(|x| x.abs()).max().unwrap())
-            .pow(2) as i64
-            * n
-            + 1;
-        let c = working_modulus(n, M);
-
-        v1.iter_mut().for_each(|x| {
-            if *x < 0 {
-                *x = (*x).rem_euclid(M)
-            }
-        });
-        v2.iter_mut().for_each(|x| {
-            if *x < 0 {
-                *x = (*x).rem_euclid(M)
-            }
-        });
+        let N = BigInt::from(n);
+        let M = (*v1.iter().max().unwrap().max(v2.iter().max().unwrap()) << 1) * N + 1;
+        let c = working_modulus(N, M);
 
         let a_forward = forward(v1, &c);
         let b_forward = forward(v2, &c);
 
-        let mut mul: Vec<i64> = vec![0; n as usize];
+        let mut mul = vec![BigInt::from(0); n as usize];
         a_forward
             .iter()
             .rev()
             .zip_longest(b_forward.iter().rev())
             .enumerate()
             .for_each(|(i, p)| match p {
-                Both(&a, &b) => mul[i] = (a * b) % c.N,
+                Both(&a, &b) => mul[i] = (a * b).rem(c.N),
                 Left(_) => {}
                 Right(_) => {}
             });
         mul.reverse();
-        let coef = inverse(mul, &c)
-            .iter()
-            .map(|&x| if x > M / 2 { -(M - x.rem_euclid(M)) } else { x })
-            .collect::<Vec<i64>>()
-            .to_vec();
+        let coef = inverse(mul, &c);
         let start = coef.iter().position(|&x| x != 0).unwrap();
 
         Polynomial {
-            coef: coef[start..(start + v1_deg + v2_deg)].to_vec(),
+            coef: coef[start..=(start + v1_deg + v2_deg)].to_vec(),
         }
+    }
+}
+
+impl Display for Polynomial {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.coef.iter().map(|&x| write!(f, "{} ", x)).collect()
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::Polynomial;
+    use crate::numbers::BigInt;
 
     #[test]
     fn add() {
-        let a = Polynomial::new(vec![1, 2, 3, 4]);
-        let b = Polynomial::new(vec![1, 2]);
-        println!("{:?}", a + b);
+        let a = Polynomial::new(vec![1, 2, 3, 4].iter().map(|&x| BigInt::from(x)).collect());
+        let b = Polynomial::new(vec![1, 2].iter().map(|&x| BigInt::from(x)).collect());
+        println!("{}", a + b);
     }
 
     #[test]
     fn mul() {
-        let a = Polynomial::new(vec![1, -2, 3]);
-        let b = Polynomial::new(vec![1, -3]);
-        println!("{:?}", a * b);
+        let a = Polynomial::new(vec![1, 2, 3].iter().map(|&x| BigInt::from(x)).collect());
+        let b = Polynomial::new(
+            vec![1, 2, 3, 4, 5, 6, 7, 8, 9]
+                .iter()
+                .map(|&x| BigInt::from(x))
+                .collect(),
+        );
+        println!("{}", a * b);
     }
 
     #[test]
     fn diff() {
-        let a = Polynomial::new(vec![3, 2, 1]);
+        let a = Polynomial::new(vec![3, 2, 1].iter().map(|&x| BigInt::from(x)).collect());
         let da = a.diff();
-        println!("{:?}", da);
+        println!("{}", da);
     }
 }
