@@ -7,7 +7,7 @@ use std::{
     },
 };
 
-use crypto_bigint::{Invert, NonZero, Wrapping, U256};
+use crypto_bigint::{rand_core::OsRng, Invert, NonZero, Random, RandomMod, Wrapping, U256};
 use itertools::Itertools;
 
 pub enum BigIntType {
@@ -74,6 +74,12 @@ impl BigInt {
             M - (rhs - *self).rem(M)
         } else {
             (*self - rhs).rem(M)
+        }
+    }
+
+    pub fn random() -> BigInt {
+        BigInt {
+            v: U256::random(&mut OsRng),
         }
     }
 }
