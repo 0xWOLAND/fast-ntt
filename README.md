@@ -34,7 +34,7 @@ fast-ntt is a Rust package to compute polynomial multiplication in O(nlog(n)) ti
 | 2 x 2             | 540.28 µs           |
 | 3 x 3             | 541.64 µs           |
 | 4 x 4             | 1.6425 ms           |
-| 5 x 5             | 1.7374              |
-| 6 x 6             | 1.7231              |
-| 7 x 7             | 1.6463              |
-| 8 x 8             | 2.3938              |
+| 5 x 5             | 1.7374 ms           |
+| 6 x 6             | 1.7231 ms           |
+| 7 x 7             | 1.6463 ms           |
+| 8 x 8             | 2.3938 ms           |
