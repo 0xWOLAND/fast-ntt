@@ -27,8 +27,8 @@ pub fn is_prime(n: BigInt) -> bool {
         s += 1;
     }
 
-    for _ in 0..5 {
-        if check_composite(n, BigInt::from(2), d, s) {
+    for a in 2..7 {
+        if check_composite(n, BigInt::from(a), d, s) {
             return false;
         }
     }

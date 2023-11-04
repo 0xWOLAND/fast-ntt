@@ -3,7 +3,6 @@ use itertools::Itertools;
 
 #[derive(Debug, Clone)]
 pub struct Constants {
-    pub k: BigInt,
     pub N: BigInt,
     pub w: BigInt,
 }
@@ -20,14 +19,15 @@ fn extended_gcd(a: BigInt, b: BigInt) -> BigInt {
     let mut t1 = BigInt::from(0);
     let mut t2 = BigInt::from(1);
     let mut t3 = BigInt::from(0);
+    let ZERO = BigInt::from(0);
 
-    while r > BigInt::from(0) {
+    while r > ZERO {
         q = b / a;
         r = b - q * a;
         s3 = s1 - q * s2;
         t3 = t1 - q * t2;
 
-        if r > BigInt::from(0) {
+        if r > ZERO {
             b = a;
             a = r;
             s1 = s2;
@@ -62,22 +62,24 @@ fn is_primitive_root(a: BigInt, deg: BigInt, N: BigInt) -> bool {
 pub fn working_modulus(n: BigInt, M: BigInt) -> Constants {
     let mut N = n + 1;
     let mut k = BigInt::from(1);
-    while (!is_prime(N)) || N < M {
+    while !(is_prime(N) && N > M) {
         k += 1;
         N = k * n + 1;
     }
+    assert!(N > M);
     let mut gen = BigInt::from(0);
+    let ONE = BigInt::from(1);
     let mut g = BigInt::from(2);
     while g < N {
         if is_primitive_root(g, N - 1, N) {
             gen = g;
             break;
         }
-        g += BigInt::from(1);
+        g += ONE;
     }
     assert!(gen > 0);
     let w = gen.mod_exp(k, N);
-    Constants { k, N, w }
+    Constants { N, w }
 }
 
 fn order_reverse(inp: &mut Vec<BigInt>) {
@@ -100,9 +102,11 @@ fn order_reverse(inp: &mut Vec<BigInt>) {
 fn fft(inp: Vec<BigInt>, c: &Constants, w: BigInt) -> Vec<BigInt> {
     let mut inp = inp.clone();
     let N = inp.len();
-    let mut pre: Vec<BigInt> = vec![BigInt::from(1); N / 2];
+    let MOD = BigInt::from(c.N);
+    let ONE = BigInt::from(1);
+    let mut pre: Vec<BigInt> = vec![ONE; N / 2];
 
-    (1..N / 2).for_each(|i| pre[i] = (pre[i - 1] * w).rem(BigInt::from(c.N)));
+    (1..N / 2).for_each(|i| pre[i] = (pre[i - 1] * w).rem(MOD));
     order_reverse(&mut inp);
 
     let mut len = 2;
@@ -116,8 +120,8 @@ fn fft(inp: Vec<BigInt>, c: &Constants, w: BigInt) -> Vec<BigInt> {
                 let l = j + half;
                 let left = inp[j];
                 let right = inp[l] * pre[k];
-                inp[j] = left.add_mod(right, BigInt::from(c.N));
-                inp[l] = left.sub_mod(right, BigInt::from(c.N));
+                inp[j] = left.add_mod(right, MOD);
+                inp[l] = left.sub_mod(right, MOD);
                 k += pre_step;
             })
         });
@@ -151,16 +155,19 @@ mod tests {
 
     #[test]
     fn test_forward() {
-        let n = 1 << rand::thread_rng().gen::<u32>() % 8;
-        let v: Vec<BigInt> = (0..n)
-            .map(|_| BigInt::from(rand::thread_rng().gen::<u32>() % (1 << 6)))
-            .collect();
-        let M = (*v.iter().max().unwrap() << 1) * BigInt::from(n) + 1;
-        let c = working_modulus(BigInt::from(n), BigInt::from(M));
-        let forward = forward(v.clone(), &c);
-        let inverse = inverse(forward, &c);
-        v.iter().zip(inverse).for_each(|(&a, b)| assert_eq!(a, b));
+        (0..100).for_each(|_| {
+            let n = 1 << rand::thread_rng().gen::<u32>() % 8;
+            let v: Vec<BigInt> = (0..n)
+                .map(|_| BigInt::from(rand::thread_rng().gen::<u32>() % (1 << 6)))
+                .collect();
+            let M = (*v.iter().max().unwrap() << 1) * BigInt::from(n) + 1;
+            let c = working_modulus(BigInt::from(n), BigInt::from(M));
+            let forward = forward(v.clone(), &c);
+            let inverse = inverse(forward, &c);
+            v.iter().zip(inverse).for_each(|(&a, b)| assert_eq!(a, b));
+        })
     }
+
     #[test]
     fn test_extended_gcd() {
         (2..11).for_each(|x: u64| {

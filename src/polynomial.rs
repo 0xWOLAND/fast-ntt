@@ -15,12 +15,13 @@ pub struct Polynomial {
 impl Polynomial {
     pub fn new(coef: Vec<BigInt>) -> Self {
         let n = coef.len();
+        let ZERO = BigInt::from(0);
 
         // if is not power of 2
         if !(n & (n - 1) == 0) {
             let pad = n.next_power_of_two() - n;
             return Self {
-                coef: vec![BigInt::from(0); pad]
+                coef: vec![ZERO; pad]
                     .into_iter()
                     .chain(coef.into_iter())
                     .collect_vec(),
@@ -28,6 +29,37 @@ impl Polynomial {
         }
         Self { coef }
     }
+
+    pub fn mul(self, rhs: Polynomial, c: &Constants) -> Polynomial {
+        let v1_deg = self.degree();
+        let v2_deg = rhs.degree();
+        let n = (self.len() + rhs.len()).next_power_of_two();
+
+        let a_forward = forward(self.coef, &c);
+        let b_forward = forward(rhs.coef, &c);
+
+        let ZERO = BigInt::from(0);
+
+        let mut mul = vec![ZERO; n as usize];
+        a_forward
+            .iter()
+            .rev()
+            .zip_longest(b_forward.iter().rev())
+            .enumerate()
+            .for_each(|(i, p)| match p {
+                Both(&a, &b) => mul[i] = (a * b).rem(c.N),
+                Left(_) => {}
+                Right(_) => {}
+            });
+        mul.reverse();
+        let coef = inverse(mul, &c);
+        let start = coef.iter().position(|&x| x != 0).unwrap();
+
+        Polynomial {
+            coef: coef[start..=(start + v1_deg + v2_deg)].to_vec(),
+        }
+    }
+
     pub fn diff(mut self) -> Self {
         let N = self.len();
         for n in (1..N).rev() {
@@ -89,53 +121,6 @@ impl Neg for Polynomial {
     }
 }
 
-impl Mul<Polynomial> for Polynomial {
-    type Output = Polynomial;
-
-    fn mul(self, rhs: Polynomial) -> Self::Output {
-        let v1_deg = self.degree();
-        let v2_deg = rhs.degree();
-        let mut v1 = self.coef;
-        let mut v2 = rhs.coef;
-        let n = (v1.len() + v2.len()).next_power_of_two();
-
-        v1 = vec![BigInt::from(0); n - v1.len()]
-            .into_iter()
-            .chain(v1.into_iter())
-            .collect();
-        v2 = vec![BigInt::from(0); n - v2.len()]
-            .into_iter()
-            .chain(v2.into_iter())
-            .collect();
-
-        let N = BigInt::from(n);
-        let M = (*v1.iter().max().unwrap().max(v2.iter().max().unwrap()) << 1) * N + 1;
-        let c = working_modulus(N, M);
-
-        let a_forward = forward(v1, &c);
-        let b_forward = forward(v2, &c);
-
-        let mut mul = vec![BigInt::from(0); n as usize];
-        a_forward
-            .iter()
-            .rev()
-            .zip_longest(b_forward.iter().rev())
-            .enumerate()
-            .for_each(|(i, p)| match p {
-                Both(&a, &b) => mul[i] = (a * b).rem(c.N),
-                Left(_) => {}
-                Right(_) => {}
-            });
-        mul.reverse();
-        let coef = inverse(mul, &c);
-        let start = coef.iter().position(|&x| x != 0).unwrap();
-
-        Polynomial {
-            coef: coef[start..=(start + v1_deg + v2_deg)].to_vec(),
-        }
-    }
-}
-
 impl Display for Polynomial {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.coef.iter().map(|&x| write!(f, "{} ", x)).collect()
@@ -145,7 +130,7 @@ impl Display for Polynomial {
 #[cfg(test)]
 mod tests {
     use super::Polynomial;
-    use crate::numbers::BigInt;
+    use crate::{ntt::working_modulus, numbers::BigInt};
 
     #[test]
     fn add() {
@@ -163,7 +148,20 @@ mod tests {
                 .map(|&x| BigInt::from(x))
                 .collect(),
         );
-        println!("{}", a * b);
+
+        let N = BigInt::from((a.len() + b.len()).next_power_of_two());
+        let M = (*a
+            .coef
+            .iter()
+            .max()
+            .unwrap()
+            .max(b.coef.iter().max().unwrap())
+            << 1)
+            * N
+            + 1;
+        let c = working_modulus(N, M);
+
+        println!("{}", a.mul(b, &c));
     }
 
     #[test]
