@@ -1,53 +1,60 @@
 use crate::numbers::BigInt;
 
-fn check_composite(n: BigInt, a: BigInt, d: BigInt, s: BigInt) -> bool {
-    let ONE = BigInt::from(1);
-    let TWO = BigInt::from(2);
-    if a.mod_exp(d, n) == ONE {
-        return false;
-    }
+fn miller_test(mut d: BigInt, n: BigInt, x: BigInt) -> bool {
+    let one = BigInt::from(1);
+    let two = BigInt::from(2);
+    let a = BigInt::from(2) + x;
 
-    let mut i = ONE;
-    while i < s {
-        if a.mod_exp(TWO.mod_exp(i, n), n) == n - ONE {
-            return false;
-        }
-        i += 1;
-    }
-    true
-}
+    let mut x = a.mod_exp(d, n);
 
-pub fn is_prime(n: BigInt) -> bool {
-    if n == 0 || n == 1 || n == 4 || n == 6 || n == 8 || n == 9 {
-        return false;
-    }
-    if n == 2 || n == 3 || n == 5 || n == 7 {
+    if x == one || x == n - one {
         return true;
     }
 
-    let mut s = BigInt::from(0);
-    let mut d: BigInt = n - 1;
-    while d.rem(BigInt::from(2)) == 0 {
-        d >>= 1;
-        s += 1;
+    while d != n - one {
+        x = (x * x).rem(n);
+        d *= two;
+
+        if x == one {
+            return false;
+        }
+        if x == n - one {
+            return true;
+        }
     }
 
-    let TWO = BigInt::from(2);
+    false
+}
 
-    for _ in 0..8 {
-        if check_composite(n, TWO, d, s) {
+pub fn is_prime(num: BigInt) -> bool {
+    let zero = BigInt::from(0);
+    let one = BigInt::from(1);
+    let two = BigInt::from(2);
+    if num <= one || num == BigInt::from(4) {
+        return false;
+    }
+    if num <= BigInt::from(3) {
+        return true;
+    }
+
+    let mut d = num - one;
+    while d.rem(two) == zero {
+        d >>= 1;
+    }
+
+    for x in 0..4 {
+        if miller_test(d, num, BigInt::from(x)) == false {
             return false;
         }
     }
     true
 }
-
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use crate::{numbers::BigInt, prime::is_prime};
 
     #[test]
-    pub fn test_is_prime() {
+    fn test_is_prime() {
         assert!(is_prime(BigInt::from(11)));
         assert!(!is_prime(BigInt::from(10)));
     }
