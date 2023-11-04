@@ -35,8 +35,17 @@ impl Polynomial {
         let v2_deg = rhs.degree();
         let n = (self.len() + rhs.len()).next_power_of_two();
 
-        let a_forward = forward(self.coef, &c);
-        let b_forward = forward(rhs.coef, &c);
+        let v1 = vec![BigInt::from(0); n - self.len()]
+            .into_iter()
+            .chain(self.coef.into_iter())
+            .collect();
+        let v2 = vec![BigInt::from(0); n - rhs.len()]
+            .into_iter()
+            .chain(rhs.coef.into_iter())
+            .collect();
+
+        let a_forward = forward(v1, &c);
+        let b_forward = forward(v2, &c);
 
         let ZERO = BigInt::from(0);
 

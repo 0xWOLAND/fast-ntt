@@ -62,11 +62,11 @@ fn is_primitive_root(a: BigInt, deg: BigInt, N: BigInt) -> bool {
 pub fn working_modulus(n: BigInt, M: BigInt) -> Constants {
     let mut N = n + 1;
     let mut k = BigInt::from(1);
-    while !(is_prime(N) && N > M) {
+    while !(is_prime(N) && N >= M) {
         k += 1;
         N = k * n + 1;
     }
-    assert!(N > M);
+    assert!(N >= M);
     let mut gen = BigInt::from(0);
     let ONE = BigInt::from(1);
     let mut g = BigInt::from(2);
