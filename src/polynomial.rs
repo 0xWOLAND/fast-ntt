@@ -30,16 +30,34 @@ impl Polynomial {
         Self { coef }
     }
 
+    pub fn mul_brute(self, rhs: Polynomial) -> Polynomial {
+        let a = self.len();
+        let b = rhs.len();
+        let ZERO = BigInt::from(0);
+
+        let mut out: Vec<BigInt> = vec![ZERO; a + b];
+
+        for i in 0..a {
+            for j in 0..b {
+                let e = i + j;
+                out[e] += self.coef[i] * rhs.coef[j];
+            }
+        }
+
+        Polynomial { coef: out }
+    }
+
     pub fn mul(self, rhs: Polynomial, c: &Constants) -> Polynomial {
         let v1_deg = self.degree();
         let v2_deg = rhs.degree();
         let n = (self.len() + rhs.len()).next_power_of_two();
+        let ZERO = BigInt::from(0);
 
-        let v1 = vec![BigInt::from(0); n - self.len()]
+        let v1 = vec![ZERO; n - self.len()]
             .into_iter()
             .chain(self.coef.into_iter())
             .collect();
-        let v2 = vec![BigInt::from(0); n - rhs.len()]
+        let v2 = vec![ZERO; n - rhs.len()]
             .into_iter()
             .chain(rhs.coef.into_iter())
             .collect();
@@ -47,20 +65,11 @@ impl Polynomial {
         let a_forward = forward(v1, &c);
         let b_forward = forward(v2, &c);
 
-        let ZERO = BigInt::from(0);
-
         let mut mul = vec![ZERO; n as usize];
-        a_forward
-            .iter()
-            .rev()
-            .zip_longest(b_forward.iter().rev())
-            .enumerate()
-            .for_each(|(i, p)| match p {
-                Both(&a, &b) => mul[i] = (a * b).rem(c.N),
-                Left(_) => {}
-                Right(_) => {}
-            });
-        mul.reverse();
+        for i in 0..n {
+            mul[i] = (a_forward[i] * b_forward[i]).rem(c.N)
+        }
+
         let coef = inverse(mul, &c);
         let start = coef.iter().position(|&x| x != 0).unwrap();
 
