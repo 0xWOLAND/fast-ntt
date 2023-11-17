@@ -2,7 +2,7 @@ use std::{
     fmt::Display,
     num::NonZeroU128,
     ops::{
-        Add, AddAssign, BitAnd, Div, DivAssign, Mul, MulAssign, Neg, Shl, ShlAssign, Shr,
+        Add, AddAssign, BitAnd, BitOr, Div, DivAssign, Mul, MulAssign, Neg, Shl, ShlAssign, Shr,
         ShrAssign, Sub, SubAssign,
     },
 };
@@ -19,7 +19,7 @@ pub enum BigIntType {
 
 #[derive(Debug, Clone, Copy)]
 pub struct BigInt {
-    v: U256,
+    pub v: U256,
 }
 
 impl BigInt {
@@ -67,6 +67,10 @@ impl BigInt {
 
     pub fn add_mod(&self, rhs: BigInt, M: BigInt) -> BigInt {
         (*self + rhs).rem(M)
+    }
+
+    pub fn mul_mod(&self, rhs: BigInt, M: BigInt) -> BigInt {
+        (*self * rhs).rem(M)
     }
 
     pub fn sub_mod(&self, rhs: BigInt, M: BigInt) -> BigInt {
@@ -499,6 +503,64 @@ impl BitAnd<u128> for BigInt {
     fn bitand(self, rhs: u128) -> Self::Output {
         BigInt {
             v: self.v & BigInt::from(rhs).v,
+        }
+    }
+}
+
+impl BitOr for BigInt {
+    type Output = BigInt;
+
+    fn bitor(self, rhs: Self) -> Self::Output {
+        BigInt { v: self.v | rhs.v }
+    }
+}
+
+impl BitOr<u16> for BigInt {
+    type Output = BigInt;
+
+    fn bitor(self, rhs: u16) -> Self::Output {
+        BigInt {
+            v: self.v | BigInt::from(rhs).v,
+        }
+    }
+}
+
+impl BitOr<i32> for BigInt {
+    type Output = BigInt;
+
+    fn bitor(self, rhs: i32) -> Self::Output {
+        BigInt {
+            v: self.v | BigInt::from(rhs).v,
+        }
+    }
+}
+
+impl BitOr<u32> for BigInt {
+    type Output = BigInt;
+
+    fn bitor(self, rhs: u32) -> Self::Output {
+        BigInt {
+            v: self.v | BigInt::from(rhs).v,
+        }
+    }
+}
+
+impl BitOr<u64> for BigInt {
+    type Output = BigInt;
+
+    fn bitor(self, rhs: u64) -> Self::Output {
+        BigInt {
+            v: self.v | BigInt::from(rhs).v,
+        }
+    }
+}
+
+impl BitOr<u128> for BigInt {
+    type Output = BigInt;
+
+    fn bitor(self, rhs: u128) -> Self::Output {
+        BigInt {
+            v: self.v | BigInt::from(rhs).v,
         }
     }
 }

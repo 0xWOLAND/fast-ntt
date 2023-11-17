@@ -1,5 +1,6 @@
 use crate::{numbers::BigInt, prime::is_prime};
-use itertools::Itertools;
+use itertools::{iterate, Itertools};
+use rayon::prelude::*;
 
 #[derive(Debug, Clone)]
 pub struct Constants {
@@ -11,15 +12,17 @@ fn extended_gcd(a: BigInt, b: BigInt) -> BigInt {
     let mut a = a;
     let mut b = b;
     let n = b;
-    let mut q = BigInt::from(0);
-    let mut r = BigInt::from(1);
-    let mut s1 = BigInt::from(1);
-    let mut s2 = BigInt::from(0);
-    let mut s3 = BigInt::from(1);
-    let mut t1 = BigInt::from(0);
-    let mut t2 = BigInt::from(1);
-    let mut t3 = BigInt::from(0);
     let ZERO = BigInt::from(0);
+    let ONE = BigInt::from(1);
+
+    let mut q = ZERO;
+    let mut r = ONE;
+    let mut s1 = ONE;
+    let mut s2 = ZERO;
+    let mut s3 = ONE;
+    let mut t1 = ZERO;
+    let mut t2 = ONE;
+    let mut t3 = ZERO;
 
     while r > ZERO {
         q = b / a;
@@ -109,23 +112,22 @@ fn fft(inp: Vec<BigInt>, c: &Constants, w: BigInt) -> Vec<BigInt> {
     (1..N / 2).for_each(|i| pre[i] = (pre[i - 1] * w).rem(MOD));
     order_reverse(&mut inp);
 
-    let mut len = 2;
+    let mut gap = inp.len() / 2;
 
-    while len <= N {
-        let half = len / 2;
-        let pre_step = N / len;
-        (0..N).step_by(len).for_each(|i| {
-            let mut k = 0;
-            (i..i + half).for_each(|j| {
-                let l = j + half;
-                let left = inp[j];
-                let right = inp[l] * pre[k];
-                inp[j] = left.add_mod(right, MOD);
-                inp[l] = left.sub_mod(right, MOD);
-                k += pre_step;
-            })
+    while gap > 0 {
+        let nchunks = inp.len() / (2 * gap);
+        inp.par_chunks_mut(2 * gap).for_each(|cxi| {
+            let (lo, hi) = cxi.split_at_mut(gap);
+            lo.par_iter_mut()
+                .zip(hi)
+                .enumerate()
+                .for_each(|(idx, (lo, hi))| {
+                    let neg = (*lo).sub_mod(*hi, MOD);
+                    *lo = (*lo).add_mod(*hi, MOD);
+                    *hi = neg.mul_mod(pre[nchunks * idx], MOD);
+                });
         });
-        len <<= 1;
+        gap /= 2;
     }
     inp
 }
