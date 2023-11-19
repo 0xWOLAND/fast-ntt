@@ -1,3 +1,5 @@
+use std::ops::Add;
+
 use crate::{numbers::BigInt, prime::is_prime};
 use itertools::Itertools;
 use rayon::prelude::*;
@@ -103,6 +105,7 @@ fn order_reverse(inp: &mut Vec<BigInt>) {
 }
 
 fn fft(inp: Vec<BigInt>, c: &Constants, w: BigInt) -> Vec<BigInt> {
+    assert!(inp.len().is_power_of_two());
     let mut inp = inp.clone();
     let N = inp.len();
     let MOD = BigInt::from(c.N);
@@ -122,9 +125,9 @@ fn fft(inp: Vec<BigInt>, c: &Constants, w: BigInt) -> Vec<BigInt> {
     });
     order_reverse(&mut inp);
 
-    let mut gap = inp.len() / 2;
+    let mut gap = 1;
 
-    while gap > 0 {
+    while gap < inp.len() {
         let nchunks = inp.len() / (2 * gap);
         inp.par_chunks_mut(2 * gap).for_each(|cxi| {
             let (lo, hi) = cxi.split_at_mut(gap);
@@ -132,6 +135,7 @@ fn fft(inp: Vec<BigInt>, c: &Constants, w: BigInt) -> Vec<BigInt> {
                 .zip(hi)
                 .enumerate()
                 .for_each(|(idx, (lo, hi))| {
+                    *hi = (*hi).mul_mod(pre[nchunks * idx], MOD);
                     let neg = if *lo < *hi {
                         (MOD + *lo) - *hi
                     } else {
@@ -142,10 +146,10 @@ fn fft(inp: Vec<BigInt>, c: &Constants, w: BigInt) -> Vec<BigInt> {
                     } else {
                         *lo + *hi
                     };
-                    *hi = neg.mul_mod(pre[nchunks * idx], MOD);
+                    *hi = neg;
                 });
         });
-        gap /= 2;
+        gap *= 2;
     }
     inp
 }

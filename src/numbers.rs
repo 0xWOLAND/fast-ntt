@@ -658,10 +658,10 @@ mod tests {
     }
 
     #[test]
-    fn test_add_mod() {
+    fn test_sub_mod() {
         let a = BigInt::from(72);
-        let b = BigInt::from(1890);
-        let N = BigInt::from(73);
+        let b = BigInt::from(73);
+        let N = BigInt::from(1890);
 
         println!("{}", a.sub_mod(b, N));
     }

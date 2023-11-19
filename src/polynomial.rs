@@ -1,6 +1,6 @@
 use std::{
     fmt::Display,
-    ops::{Add, Mul, Neg, Sub},
+    ops::{Add, Index, Mul, Neg, Sub},
 };
 
 use itertools::{EitherOrBoth::*, Itertools};
@@ -74,8 +74,8 @@ impl Polynomial {
             .for_each(|(i, x)| *x = (a_forward[i] * b_forward[i]).rem(c.N));
 
         let coef = inverse(mul, &c);
-        let start = coef.iter().position(|&x| x != 0).unwrap();
-
+        // n - polynomial degree - 1
+        let start = n - (v1_deg + v2_deg + 1) - 1;
         Polynomial {
             coef: coef[start..=(start + v1_deg + v2_deg)].to_vec(),
         }
@@ -148,8 +148,19 @@ impl Display for Polynomial {
     }
 }
 
+impl Index<usize> for Polynomial {
+    type Output = BigInt;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.coef[index]
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use itertools::Itertools;
+    use rand::Rng;
+
     use super::Polynomial;
     use crate::{ntt::working_modulus, numbers::BigInt};
 
@@ -162,27 +173,33 @@ mod tests {
 
     #[test]
     fn mul() {
-        let a = Polynomial::new(vec![1, 2, 3].iter().map(|&x| BigInt::from(x)).collect());
-        let b = Polynomial::new(
-            vec![1, 2, 3, 4, 5, 6, 7, 8, 9]
+        let ONE = BigInt::from(1);
+        (0..10).for_each(|_| {
+            let n: usize = 1 << rand::thread_rng().gen::<usize>() % (1 << 3);
+            let v1: Vec<BigInt> = (0..n)
+                .map(|_| BigInt::from(rand::thread_rng().gen::<u32>() % (1 << 6)))
+                .collect();
+            let v2: Vec<BigInt> = (0..n)
+                .map(|_| BigInt::from(rand::thread_rng().gen::<u32>() % (1 << 6)))
+                .collect();
+            let a = Polynomial::new(vec![ONE].into_iter().chain(v1.into_iter()).collect_vec());
+            let b = Polynomial::new(vec![ONE].into_iter().chain(v2.into_iter()).collect_vec());
+
+            let N = BigInt::from((a.len() + b.len()).next_power_of_two());
+            let M = (*a
+                .coef
                 .iter()
-                .map(|&x| BigInt::from(x))
-                .collect(),
-        );
+                .max()
+                .unwrap()
+                .max(b.coef.iter().max().unwrap())
+                << 1)
+                * N
+                + 1;
+            let c = working_modulus(N, M);
 
-        let N = BigInt::from((a.len() + b.len()).next_power_of_two());
-        let M = (*a
-            .coef
-            .iter()
-            .max()
-            .unwrap()
-            .max(b.coef.iter().max().unwrap())
-            << 1)
-            * N
-            + 1;
-        let c = working_modulus(N, M);
-
-        println!("{}", a.mul(b, &c));
+            let mul = a.mul(b, &c);
+            assert_eq!(mul[0], ONE);
+        });
     }
 
     #[test]
