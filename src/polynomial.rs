@@ -4,6 +4,9 @@ use std::{
 };
 
 use itertools::{EitherOrBoth::*, Itertools};
+use rayon::iter::{
+    IndexedParallelIterator, IntoParallelRefIterator, IntoParallelRefMutIterator, ParallelIterator,
+};
 
 use crate::{ntt::*, numbers::BigInt};
 
@@ -66,9 +69,9 @@ impl Polynomial {
         let b_forward = forward(v2, &c);
 
         let mut mul = vec![ZERO; n as usize];
-        for i in 0..n {
-            mul[i] = (a_forward[i] * b_forward[i]).rem(c.N)
-        }
+        mul.par_iter_mut()
+            .enumerate()
+            .for_each(|(i, x)| *x = (a_forward[i] * b_forward[i]).rem(c.N));
 
         let coef = inverse(mul, &c);
         let start = coef.iter().position(|&x| x != 0).unwrap();
