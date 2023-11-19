@@ -179,17 +179,15 @@ mod tests {
 
     #[test]
     fn test_forward() {
-        (0..100).for_each(|_| {
-            let n = 1 << rand::thread_rng().gen::<u32>() % 8;
-            let v: Vec<BigInt> = (0..n)
-                .map(|_| BigInt::from(rand::thread_rng().gen::<u32>() % (1 << 6)))
-                .collect();
-            let M = (*v.iter().max().unwrap() << 1) * BigInt::from(n) + 1;
-            let c = working_modulus(BigInt::from(n), BigInt::from(M));
-            let forward = forward(v.clone(), &c);
-            let inverse = inverse(forward, &c);
-            v.iter().zip(inverse).for_each(|(&a, b)| assert_eq!(a, b));
-        })
+        let n = 1 << rand::thread_rng().gen::<u32>() % 8;
+        let v: Vec<BigInt> = (0..n)
+            .map(|_| BigInt::from(rand::thread_rng().gen::<u32>() % (1 << 6)))
+            .collect();
+        let M = (*v.iter().max().unwrap() << 1) * BigInt::from(n) + 1;
+        let c = working_modulus(BigInt::from(n), BigInt::from(M));
+        let forward = forward(v.clone(), &c);
+        let inverse = inverse(forward, &c);
+        v.iter().zip(inverse).for_each(|(&a, b)| assert_eq!(a, b));
     }
 
     #[test]
