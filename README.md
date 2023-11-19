@@ -30,6 +30,9 @@ fast-ntt is a Rust package to compute polynomial multiplication in `O(nlog(n))` 
 Generate benchmarks using:
 
 ```bash
+# If you don't have it already
+cargo install cargo-criterion criterion-table
+
 cargo criterion --message-format=json | criterion-table > BENCHMARKS.md
 ```
 

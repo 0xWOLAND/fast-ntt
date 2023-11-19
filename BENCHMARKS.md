@@ -10,7 +10,7 @@
 ## Overview
 
 This benchmark comparison report shows the difference in performance between parallel, NTT-based and serial, brute-force 
-polynomial multiplication algorithms. Each entry in the first table.
+polynomial multiplication algorithms. Each row entry in the first table is an n-degree forward NTT and each row entry in the second table represents an n-degree polynomial multiplication.
 
 Computer Stats:
 
