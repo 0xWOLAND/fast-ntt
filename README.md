@@ -1,4 +1,4 @@
-# fast-ntt
+# fast-ntt [![Rust](https://github.com/0xWOLAND/fast-ntt/actions/workflows/rust.yml/badge.svg)](https://github.com/0xWOLAND/fast-ntt/actions/workflows/rust.yml)
 
 fast-ntt is a Rust package to compute polynomial multiplication in `O(nlog(n))` time.
 
@@ -26,6 +26,15 @@ fast-ntt is a Rust package to compute polynomial multiplication in `O(nlog(n))` 
 ```
 
 ## Benchmarks
+
+Computer Stats:
+
+```
+CPU(s):                          16
+Thread(s) per core:              2
+Core(s) per socket:              8
+Socket(s):                       1
+```
 
 ### Number-Theoretic Transform
 
