@@ -27,7 +27,7 @@ fast-ntt is a Rust package to compute polynomial multiplication in `O(nlog(n))` 
 
 ## Benchmarks
 
-#### Number-Theoretic Transform
+### Number-Theoretic Transform
 
 | Polynomial Degree | NTT       |
 | ----------------- | --------- |
@@ -42,11 +42,10 @@ fast-ntt is a Rust package to compute polynomial multiplication in `O(nlog(n))` 
 | 16384             | 34.160 ms |
 | 32768             | 79.303 ms |
 
-#### Polynomial Multiplication
+### Polynomial Multiplication
 
-```
 | Polynomial Degree | NTT-Based | Brute-Force |
-|-------------------|-----------|-------------|
+| ----------------- | --------- | ----------- |
 | 64                | 1.2677 ms | 50.389 µs   |
 | 128               | 2.3206 ms | 196.92 µs   |
 | 256               | 3.6952 ms | 777.25 µs   |
@@ -57,4 +56,3 @@ fast-ntt is a Rust package to compute polynomial multiplication in `O(nlog(n))` 
 | 8192              | 115.62 ms | 812.68 ms   |
 | 16384             | 241.09 ms | 3.2130 s    |
 | 32768             | 502.79 ms | 12.959 s    |
-```
