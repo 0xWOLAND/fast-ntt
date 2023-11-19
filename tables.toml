@@ -1,0 +1,17 @@
+[top_comments]
+Overview = """
+This benchmark comparison report shows the difference in performance between parallel, NTT-based and serial, brute-force 
+polynomial multiplication algorithms. Each entry in the first table.
+
+Computer Stats:
+
+```
+CPU(s):                          16
+Thread(s) per core:              2
+Core(s) per socket:              8
+Socket(s):                       1
+```
+"""
+
+[table_comments]
+criterion_benchmark = """"""

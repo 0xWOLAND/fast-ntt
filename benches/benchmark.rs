@@ -29,41 +29,38 @@ fn bench_forward(n: usize, c: &Constants) {
 }
 
 fn criterion_forward(c: &mut Criterion) {
-    let mut group = c.benchmark_group("bench_forward");
-    (6..deg).for_each(|x| {
-        group.bench_function(BenchmarkId::from_parameter(x), |b| {
-            let c = working_modulus(BigInt::from(x), BigInt::from(2 * x + 1));
-            b.iter(|| bench_forward(black_box(1 << x), black_box(&c)))
+    let mut group = c.benchmark_group("Number-Theoretic Transform Benchmarks");
+    (6..deg).for_each(|n| {
+        let id = BenchmarkId::new("NTT", 1 << n);
+        let c = working_modulus(BigInt::from(n), BigInt::from(2 * n + 1));
+        group.bench_with_input(id, &n, |b, n| {
+            b.iter(|| bench_forward(black_box(1 << n), black_box(&c)))
         });
     });
 }
 
-fn criterion_mul(c: &mut Criterion) {
-    let mut group = c.benchmark_group("bench_mul");
-    (6..deg).for_each(|x| {
-        group.bench_function(BenchmarkId::from_parameter(x), |b| {
-            let N = BigInt::from((2 * x as usize).next_power_of_two());
-            let M = N << 1 + 1;
-            let c = working_modulus(N, M);
-            b.iter(|| bench_mul(black_box(1 << x), black_box(1 << x), black_box(&c)))
-        });
-    });
-    group.finish();
-}
+fn criterion_benchmark(c: &mut Criterion) {
+    let mut group = c.benchmark_group("Polynomial Multiplication Benchmarks");
 
-fn criterion_brute_mul(c: &mut Criterion) {
-    let mut group = c.benchmark_group("bench_brute_mul");
-    (6..deg).for_each(|x| {
-        group.bench_function(BenchmarkId::from_parameter(x), |b| {
-            b.iter(|| bench_mul_brute(black_box(1 << x), black_box(1 << x)))
+    (6..deg).for_each(|n| {
+        let id = BenchmarkId::new("NTT-Based", 1 << n);
+        let N = BigInt::from((2 * n).next_power_of_two());
+        let M = N << 1 + 1;
+        let c = working_modulus(N, M);
+        group.bench_with_input(id, &n, |b, n| {
+            b.iter(|| bench_mul(black_box(1 << n), black_box(1 << n), black_box(&c)))
+        });
+
+        let id = BenchmarkId::new("Brute-Force", 1 << n);
+        group.bench_with_input(id, &n, |b, n| {
+            b.iter(|| bench_mul_brute(black_box(1 << n), black_box(1 << n)))
         });
     });
-    group.finish();
 }
 
 criterion_group! {
   name = benches;
   config = Criterion::default().sample_size(10);
-  targets = criterion_forward, criterion_mul, criterion_brute_mul
+  targets = criterion_forward, criterion_benchmark
 }
 criterion_main!(benches);
