@@ -86,6 +86,11 @@ impl BigInt {
             v: U256::random(&mut OsRng),
         }
     }
+
+    pub fn reverse(&self) -> BigInt {
+        let mut v = self.v;
+        BigInt { v }
+    }
 }
 
 impl From<u16> for BigInt {

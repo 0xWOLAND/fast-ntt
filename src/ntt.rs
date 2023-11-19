@@ -111,8 +111,9 @@ fn fft(inp: Vec<BigInt>, c: &Constants, w: BigInt) -> Vec<BigInt> {
     let CHUNK_COUNT = 128;
     let chunk_count = BigInt::from(CHUNK_COUNT);
 
-    (1..N / (2 * CHUNK_COUNT))
-        .for_each(|i| pre[i * CHUNK_COUNT] = w.mod_exp(BigInt::from(i) * chunk_count, MOD));
+    pre.par_chunks_mut(CHUNK_COUNT)
+        .enumerate()
+        .for_each(|(i, arr)| arr[0] = w.mod_exp(BigInt::from(i) * chunk_count, MOD));
     pre.par_chunks_mut(CHUNK_COUNT).for_each(|x| {
         (1..x.len()).for_each(|y| {
             let _x = x.to_vec();
