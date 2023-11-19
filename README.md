@@ -24,3 +24,13 @@ fast-ntt is a Rust package to compute polynomial multiplication in `O(nlog(n))` 
     let a = Polynomial::new(vec![3, 2, 1].iter().map(|&x| BigInt::from(x)).collect());
     let da = a.diff();
 ```
+
+## Benchmarks
+
+Generate benchmarks using:
+
+```bash
+cargo criterion --message-format=json | criterion-table > BENCHMARKS.md
+```
+
+Benchmarks are also available [here](./BENCHMARKS.md)
