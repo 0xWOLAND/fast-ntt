@@ -132,8 +132,16 @@ fn fft(inp: Vec<BigInt>, c: &Constants, w: BigInt) -> Vec<BigInt> {
                 .zip(hi)
                 .enumerate()
                 .for_each(|(idx, (lo, hi))| {
-                    let neg = (*lo).sub_mod(*hi, MOD);
-                    *lo = (*lo).add_mod(*hi, MOD);
+                    let neg = if *lo < *hi {
+                        (MOD + *lo) - *hi
+                    } else {
+                        *lo - *hi
+                    };
+                    *lo = if *lo + *hi >= MOD {
+                        (*lo + *hi) - MOD
+                    } else {
+                        *lo + *hi
+                    };
                     *hi = neg.mul_mod(pre[nchunks * idx], MOD);
                 });
         });
