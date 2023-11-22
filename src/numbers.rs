@@ -7,8 +7,13 @@ use std::{
     },
 };
 
-use crypto_bigint::{rand_core::OsRng, Invert, NonZero, Random, RandomMod, Wrapping, U256};
+use crypto_bigint::{
+    modular::runtime_mod::{DynResidue, DynResidueParams},
+    rand_core::OsRng,
+    Invert, NonZero, Random, RandomMod, Wrapping, U256,
+};
 use itertools::Itertools;
+use rand::{thread_rng, Rng};
 
 pub enum BigIntType {
     U16(u16),
@@ -20,10 +25,14 @@ pub enum BigIntType {
 #[derive(Debug, Clone, Copy)]
 pub struct BigInt {
     pub v: U256,
+    params: DynResidueParams<4>,
 }
 
 impl BigInt {
     pub fn new(_v: BigIntType) -> Self {
+        let params = DynResidueParams::new(&U256::from_be_hex(
+            "ffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551",
+        ));
         Self {
             v: match _v {
                 BigIntType::U16(x) => U256::from(x),
@@ -32,12 +41,14 @@ impl BigInt {
                 BigIntType::U128(x) => U256::from(x),
                 _ => panic!("received invalid `BigIntType`"),
             },
+            params,
         }
     }
 
     pub fn rem(&self, num: BigInt) -> Self {
         BigInt {
             v: self.v.const_rem(&num.v).0,
+            params: self.params,
         }
     }
 
@@ -62,6 +73,7 @@ impl BigInt {
     pub fn sqrt(&self) -> BigInt {
         BigInt {
             v: self.v.sqrt_vartime(),
+            params: self.params,
         }
     }
 
@@ -82,14 +94,16 @@ impl BigInt {
     }
 
     pub fn random() -> BigInt {
-        BigInt {
-            v: U256::random(&mut OsRng),
-        }
+        let x = rand::thread_rng().gen::<u128>();
+        BigInt::new(BigIntType::U128(x))
     }
 
     pub fn reverse(&self) -> BigInt {
         let mut v = self.v;
-        BigInt { v }
+        BigInt {
+            v,
+            params: self.params,
+        }
     }
 }
 
@@ -133,9 +147,11 @@ impl Add for BigInt {
     type Output = BigInt;
 
     fn add(self, rhs: Self) -> Self::Output {
-        Self {
-            v: (Wrapping(self.v) + Wrapping(rhs.v)).0,
-        }
+        let params = self.params;
+        let x = DynResidue::new(&self.v, params);
+        let y = DynResidue::new(&rhs.v, params);
+        let v = U256::from((x + y).retrieve());
+        Self { v, params }
     }
 }
 
@@ -145,6 +161,7 @@ impl Add<u16> for BigInt {
     fn add(self, rhs: u16) -> Self::Output {
         Self {
             v: (Wrapping(self.v) + Wrapping(BigInt::from(rhs).v)).0,
+            params: self.params,
         }
     }
 }
@@ -155,6 +172,7 @@ impl Add<i32> for BigInt {
     fn add(self, rhs: i32) -> Self::Output {
         Self {
             v: (Wrapping(self.v) + Wrapping(BigInt::from(rhs).v)).0,
+            params: self.params,
         }
     }
 }
@@ -165,6 +183,7 @@ impl Add<u32> for BigInt {
     fn add(self, rhs: u32) -> Self::Output {
         Self {
             v: (-Wrapping(BigInt::from(rhs).v)).0,
+            params: self.params,
         }
     }
 }
@@ -175,6 +194,7 @@ impl Add<u64> for BigInt {
     fn add(self, rhs: u64) -> Self::Output {
         Self {
             v: (Wrapping(self.v) + Wrapping(BigInt::from(rhs).v)).0,
+            params: self.params,
         }
     }
 }
@@ -185,6 +205,7 @@ impl Add<u128> for BigInt {
     fn add(self, rhs: u128) -> Self::Output {
         Self {
             v: (Wrapping(self.v) + Wrapping(BigInt::from(rhs).v)).0,
+            params: self.params,
         }
     }
 }
@@ -229,9 +250,11 @@ impl Sub for BigInt {
     type Output = BigInt;
 
     fn sub(self, rhs: Self) -> Self::Output {
-        BigInt {
-            v: (Wrapping(self.v) - Wrapping(rhs.v)).0,
-        }
+        let params = self.params;
+        let x = DynResidue::new(&self.v, params);
+        let y = DynResidue::new(&rhs.v, params);
+        let v = U256::from((x - y).retrieve());
+        Self { v, params }
     }
 }
 
@@ -325,6 +348,7 @@ impl Neg for BigInt {
     fn neg(self) -> Self::Output {
         Self {
             v: (Wrapping(U256::MAX) - Wrapping(self.v)).0,
+            params: self.params,
         }
     }
 }
@@ -333,9 +357,11 @@ impl Mul for BigInt {
     type Output = BigInt;
 
     fn mul(self, rhs: Self) -> Self::Output {
-        Self {
-            v: (Wrapping(self.v) * Wrapping(rhs.v)).0,
-        }
+        let params = self.params;
+        let x = DynResidue::new(&self.v, params);
+        let y = DynResidue::new(&rhs.v, params);
+        let v = U256::from((x * y).retrieve());
+        Self { v, params }
     }
 }
 
@@ -354,6 +380,7 @@ impl Div for BigInt {
         let half = half + (lower as u128);
         BigInt {
             v: (Wrapping(self.v) / NonZero::from(NonZeroU128::new(half).unwrap())).0,
+            params: self.params,
         }
     }
 }
@@ -364,6 +391,7 @@ impl Invert for BigInt {
     fn invert(&self) -> Self::Output {
         BigInt {
             v: self.v.inv_mod(&U256::MAX).0,
+            params: self.params,
         }
     }
 }
@@ -458,7 +486,10 @@ impl BitAnd for BigInt {
     type Output = BigInt;
 
     fn bitand(self, rhs: Self) -> Self::Output {
-        BigInt { v: self.v & rhs.v }
+        BigInt {
+            v: self.v & rhs.v,
+            params: self.params,
+        }
     }
 }
 
@@ -468,6 +499,7 @@ impl BitAnd<u16> for BigInt {
     fn bitand(self, rhs: u16) -> Self::Output {
         BigInt {
             v: self.v & BigInt::from(rhs).v,
+            params: self.params,
         }
     }
 }
@@ -478,6 +510,7 @@ impl BitAnd<i32> for BigInt {
     fn bitand(self, rhs: i32) -> Self::Output {
         BigInt {
             v: self.v & BigInt::from(rhs).v,
+            params: self.params,
         }
     }
 }
@@ -488,6 +521,7 @@ impl BitAnd<u32> for BigInt {
     fn bitand(self, rhs: u32) -> Self::Output {
         BigInt {
             v: self.v & BigInt::from(rhs).v,
+            params: self.params,
         }
     }
 }
@@ -498,6 +532,7 @@ impl BitAnd<u64> for BigInt {
     fn bitand(self, rhs: u64) -> Self::Output {
         BigInt {
             v: self.v & BigInt::from(rhs).v,
+            params: self.params,
         }
     }
 }
@@ -508,6 +543,7 @@ impl BitAnd<u128> for BigInt {
     fn bitand(self, rhs: u128) -> Self::Output {
         BigInt {
             v: self.v & BigInt::from(rhs).v,
+            params: self.params,
         }
     }
 }
@@ -516,7 +552,10 @@ impl BitOr for BigInt {
     type Output = BigInt;
 
     fn bitor(self, rhs: Self) -> Self::Output {
-        BigInt { v: self.v | rhs.v }
+        BigInt {
+            v: self.v | rhs.v,
+            params: self.params,
+        }
     }
 }
 
@@ -526,6 +565,7 @@ impl BitOr<u16> for BigInt {
     fn bitor(self, rhs: u16) -> Self::Output {
         BigInt {
             v: self.v | BigInt::from(rhs).v,
+            params: self.params,
         }
     }
 }
@@ -536,6 +576,7 @@ impl BitOr<i32> for BigInt {
     fn bitor(self, rhs: i32) -> Self::Output {
         BigInt {
             v: self.v | BigInt::from(rhs).v,
+            params: self.params,
         }
     }
 }
@@ -546,6 +587,7 @@ impl BitOr<u32> for BigInt {
     fn bitor(self, rhs: u32) -> Self::Output {
         BigInt {
             v: self.v | BigInt::from(rhs).v,
+            params: self.params,
         }
     }
 }
@@ -556,6 +598,7 @@ impl BitOr<u64> for BigInt {
     fn bitor(self, rhs: u64) -> Self::Output {
         BigInt {
             v: self.v | BigInt::from(rhs).v,
+            params: self.params,
         }
     }
 }
@@ -566,6 +609,7 @@ impl BitOr<u128> for BigInt {
     fn bitor(self, rhs: u128) -> Self::Output {
         BigInt {
             v: self.v | BigInt::from(rhs).v,
+            params: self.params,
         }
     }
 }
@@ -574,7 +618,10 @@ impl Shl<usize> for BigInt {
     type Output = BigInt;
 
     fn shl(self, rhs: usize) -> Self::Output {
-        BigInt { v: self.v << rhs }
+        BigInt {
+            v: self.v << rhs,
+            params: self.params,
+        }
     }
 }
 
@@ -582,7 +629,10 @@ impl Shr<usize> for BigInt {
     type Output = BigInt;
 
     fn shr(self, rhs: usize) -> Self::Output {
-        BigInt { v: self.v >> rhs }
+        BigInt {
+            v: self.v >> rhs,
+            params: self.params,
+        }
     }
 }
 
@@ -636,6 +686,13 @@ mod tests {
                 );
             })
         })
+    }
+
+    #[test]
+    fn test_mul() {
+        let a = BigInt::from(8);
+        let b = BigInt::from(10);
+        println!("{}", a * b);
     }
 
     #[test]
