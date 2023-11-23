@@ -1,4 +1,5 @@
 use std::{
+    cmp::Ordering,
     fmt::Display,
     num::NonZeroU128,
     ops::{
@@ -7,8 +8,15 @@ use std::{
     },
 };
 
-use crypto_bigint::{rand_core::OsRng, Invert, NonZero, Random, RandomMod, Wrapping, U256};
+use crypto_bigint::{
+    modular::{
+        runtime_mod::{DynResidue, DynResidueParams},
+        Retrieve,
+    },
+    Invert, NonZero, Uint, U128, U256,
+};
 use itertools::Itertools;
+use rand::{thread_rng, Error, Rng};
 
 pub enum BigIntType {
     U16(u16),
@@ -19,77 +27,92 @@ pub enum BigIntType {
 
 #[derive(Debug, Clone, Copy)]
 pub struct BigInt {
-    pub v: U256,
+    pub v: DynResidue<4>,
 }
 
 impl BigInt {
     pub fn new(_v: BigIntType) -> Self {
+        let params = DynResidueParams::new(&U256::from_be_hex(
+            "ffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551",
+        ));
         Self {
             v: match _v {
-                BigIntType::U16(x) => U256::from(x),
-                BigIntType::U32(x) => U256::from(x),
-                BigIntType::U64(x) => U256::from(x),
-                BigIntType::U128(x) => U256::from(x),
+                BigIntType::U16(x) => DynResidue::new(&U256::from(x), params),
+                BigIntType::U32(x) => DynResidue::new(&U256::from(x), params),
+                BigIntType::U64(x) => DynResidue::new(&U256::from(x), params),
+                BigIntType::U128(x) => DynResidue::new(&U256::from(x), params),
                 _ => panic!("received invalid `BigIntType`"),
             },
         }
     }
 
-    pub fn rem(&self, num: BigInt) -> Self {
-        BigInt {
-            v: self.v.const_rem(&num.v).0,
+    pub fn set_mod(&mut self, M: BigInt) -> Result<(), String> {
+        if M.is_even() {
+            return Err("modulus must be odd".to_string());
         }
+        let params = DynResidueParams::new(&(U256::from(M.v.retrieve())));
+        self.v = DynResidue::new(&self.v.retrieve(), params);
+        Ok(())
+    }
+
+    pub fn set_mod_from_residue(&mut self, params: DynResidueParams<4>) {
+        self.v = DynResidue::new(&self.v.retrieve(), params);
+    }
+
+    pub fn rem(&self, M: BigInt) -> BigInt {
+        let mut res = self.clone();
+        if res < M {
+            return res;
+        }
+        res.v = DynResidue::new(
+            &res.v.retrieve().rem(&NonZero::from_uint(M.v.retrieve())),
+            res.params(),
+        );
+        res
+    }
+
+    pub fn params(&self) -> DynResidueParams<4> {
+        *self.v.params()
     }
 
     pub fn mod_exp(&self, exp: BigInt, M: BigInt) -> BigInt {
-        let mut res: BigInt = if exp & 1 > 0 {
+        let mut res: BigInt = if !exp.is_even() {
             self.clone()
         } else {
             BigInt::from(1)
         };
         let mut b = self.clone();
         let mut e = exp.clone();
+        res.set_mod(M);
+        b.set_mod(M);
         while e > 0 {
             e >>= 1;
-            b = (b * b).rem(M);
-            if e & 1 > 0 {
-                res = (res * b).rem(M);
+            b = b * b;
+            if M.is_even() {
+                b = b.rem(M);
+            }
+            if !e.is_even() && !e.is_zero() {
+                res = b * res;
+                if M.is_even() {
+                    res = res.rem(M);
+                }
             }
         }
         res
     }
 
-    pub fn sqrt(&self) -> BigInt {
-        BigInt {
-            v: self.v.sqrt_vartime(),
-        }
-    }
-
-    pub fn add_mod(&self, rhs: BigInt, M: BigInt) -> BigInt {
-        (*self + rhs).rem(M)
-    }
-
-    pub fn mul_mod(&self, rhs: BigInt, M: BigInt) -> BigInt {
-        (*self * rhs).rem(M)
-    }
-
-    pub fn sub_mod(&self, rhs: BigInt, M: BigInt) -> BigInt {
-        if rhs > *self {
-            M - (rhs - *self).rem(M)
-        } else {
-            (*self - rhs).rem(M)
-        }
-    }
-
     pub fn random() -> BigInt {
-        BigInt {
-            v: U256::random(&mut OsRng),
-        }
+        let x = rand::thread_rng().gen::<u128>();
+        BigInt::new(BigIntType::U128(x))
     }
 
-    pub fn reverse(&self) -> BigInt {
-        let mut v = self.v;
-        BigInt { v }
+    pub fn is_zero(&self) -> bool {
+        self.v.retrieve().bits() == 0
+    }
+
+    pub fn is_even(&self) -> bool {
+        let is_odd: bool = self.v.retrieve().bit(0).into();
+        !is_odd
     }
 }
 
@@ -133,9 +156,12 @@ impl Add for BigInt {
     type Output = BigInt;
 
     fn add(self, rhs: Self) -> Self::Output {
-        Self {
-            v: (Wrapping(self.v) + Wrapping(rhs.v)).0,
+        if rhs.v.params() != self.v.params() {
+            let mut rhs = rhs.clone();
+            rhs.set_mod_from_residue(self.params());
+            return Self { v: self.v + rhs.v };
         }
+        Self { v: self.v + rhs.v }
     }
 }
 
@@ -144,7 +170,7 @@ impl Add<u16> for BigInt {
 
     fn add(self, rhs: u16) -> Self::Output {
         Self {
-            v: (Wrapping(self.v) + Wrapping(BigInt::from(rhs).v)).0,
+            v: self.v + BigInt::from(rhs).v,
         }
     }
 }
@@ -154,7 +180,7 @@ impl Add<i32> for BigInt {
 
     fn add(self, rhs: i32) -> Self::Output {
         Self {
-            v: (Wrapping(self.v) + Wrapping(BigInt::from(rhs).v)).0,
+            v: self.v + BigInt::from(rhs).v,
         }
     }
 }
@@ -164,7 +190,7 @@ impl Add<u32> for BigInt {
 
     fn add(self, rhs: u32) -> Self::Output {
         Self {
-            v: (-Wrapping(BigInt::from(rhs).v)).0,
+            v: self.v + BigInt::from(rhs).v,
         }
     }
 }
@@ -174,7 +200,7 @@ impl Add<u64> for BigInt {
 
     fn add(self, rhs: u64) -> Self::Output {
         Self {
-            v: (Wrapping(self.v) + Wrapping(BigInt::from(rhs).v)).0,
+            v: self.v + BigInt::from(rhs).v,
         }
     }
 }
@@ -184,7 +210,7 @@ impl Add<u128> for BigInt {
 
     fn add(self, rhs: u128) -> Self::Output {
         Self {
-            v: (Wrapping(self.v) + Wrapping(BigInt::from(rhs).v)).0,
+            v: self.v + BigInt::from(rhs).v,
         }
     }
 }
@@ -229,9 +255,12 @@ impl Sub for BigInt {
     type Output = BigInt;
 
     fn sub(self, rhs: Self) -> Self::Output {
-        BigInt {
-            v: (Wrapping(self.v) - Wrapping(rhs.v)).0,
+        if rhs.v.params() != self.v.params() {
+            let mut rhs = rhs.clone();
+            rhs.set_mod_from_residue(self.params());
+            return Self { v: self.v - rhs.v };
         }
+        Self { v: self.v - rhs.v }
     }
 }
 
@@ -323,9 +352,7 @@ impl Neg for BigInt {
     type Output = BigInt;
 
     fn neg(self) -> Self::Output {
-        Self {
-            v: (Wrapping(U256::MAX) - Wrapping(self.v)).0,
-        }
+        Self { v: self.v.neg() }
     }
 }
 
@@ -333,9 +360,12 @@ impl Mul for BigInt {
     type Output = BigInt;
 
     fn mul(self, rhs: Self) -> Self::Output {
-        Self {
-            v: (Wrapping(self.v) * Wrapping(rhs.v)).0,
+        if rhs.v.params() != self.v.params() {
+            let mut rhs = rhs.clone();
+            rhs.set_mod_from_residue(self.params());
+            return Self { v: self.v * rhs.v };
         }
+        Self { v: self.v * rhs.v }
     }
 }
 
@@ -349,11 +379,15 @@ impl Div for BigInt {
     type Output = BigInt;
 
     fn div(self, rhs: Self) -> Self::Output {
-        let [lower, upper, _, _] = rhs.v.to_words();
-        let half = (upper as u128) << 64;
-        let half = half + (lower as u128);
         BigInt {
-            v: (Wrapping(self.v) / NonZero::from(NonZeroU128::new(half).unwrap())).0,
+            v: DynResidue::new(
+                &(self
+                    .v
+                    .retrieve()
+                    .div_rem(&NonZero::from_uint(rhs.v.retrieve()))
+                    .0),
+                self.params(),
+            ),
         }
     }
 }
@@ -363,7 +397,7 @@ impl Invert for BigInt {
 
     fn invert(&self) -> Self::Output {
         BigInt {
-            v: self.v.inv_mod(&U256::MAX).0,
+            v: self.v.invert().0,
         }
     }
 }
@@ -378,79 +412,83 @@ impl Eq for BigInt {}
 
 impl Ord for BigInt {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.v.cmp(&other.v)
+        let half = self
+            .params()
+            .modulus()
+            .div(NonZero::from(NonZeroU128::new(2).unwrap()));
+        (self.v - other.v).retrieve().cmp(&half)
     }
 }
 
 impl PartialEq for BigInt {
     fn eq(&self, other: &Self) -> bool {
-        self.v == other.v
+        self.v.retrieve() == other.v.retrieve()
     }
 }
 
 impl PartialEq<u16> for BigInt {
     fn eq(&self, other: &u16) -> bool {
-        self.v == BigInt::from(*other).v
+        self.v.retrieve() == BigInt::from(*other).v.retrieve()
     }
 }
 
 impl PartialEq<i32> for BigInt {
     fn eq(&self, other: &i32) -> bool {
-        self.v == BigInt::from(*other).v
+        self.v.retrieve() == BigInt::from(*other).v.retrieve()
     }
 }
 
 impl PartialEq<u32> for BigInt {
     fn eq(&self, other: &u32) -> bool {
-        self.v == BigInt::from(*other).v
+        self.v.retrieve() == BigInt::from(*other).v.retrieve()
     }
 }
 
 impl PartialEq<u64> for BigInt {
     fn eq(&self, other: &u64) -> bool {
-        self.v == BigInt::from(*other).v
+        self.v.retrieve() == BigInt::from(*other).v.retrieve()
     }
 }
 
 impl PartialEq<u128> for BigInt {
     fn eq(&self, other: &u128) -> bool {
-        self.v == BigInt::from(*other).v
+        self.v.retrieve() == BigInt::from(*other).v.retrieve()
     }
 }
 
 impl PartialOrd for BigInt {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.v.partial_cmp(&other.v)
+        (self.v.retrieve()).partial_cmp(&(other.v.retrieve()))
     }
 }
 
 impl PartialOrd<u16> for BigInt {
     fn partial_cmp(&self, other: &u16) -> Option<std::cmp::Ordering> {
-        self.v.partial_cmp(&BigInt::from(*other).v)
+        (self.v.retrieve()).partial_cmp(&BigInt::from(*other).v.retrieve())
     }
 }
 
 impl PartialOrd<i32> for BigInt {
     fn partial_cmp(&self, other: &i32) -> Option<std::cmp::Ordering> {
-        self.v.partial_cmp(&BigInt::from(*other).v)
+        (self.v.retrieve()).partial_cmp(&BigInt::from(*other).v.retrieve())
     }
 }
 
 impl PartialOrd<u32> for BigInt {
     fn partial_cmp(&self, other: &u32) -> Option<std::cmp::Ordering> {
-        self.v.partial_cmp(&BigInt::from(*other).v)
+        (self.v.retrieve()).partial_cmp(&BigInt::from(*other).v.retrieve())
     }
 }
 
 impl PartialOrd<u64> for BigInt {
     fn partial_cmp(&self, other: &u64) -> Option<std::cmp::Ordering> {
-        self.v.partial_cmp(&BigInt::from(*other).v)
+        (self.v.retrieve()).partial_cmp(&BigInt::from(*other).v.retrieve())
     }
 }
 
 impl PartialOrd<u128> for BigInt {
     fn partial_cmp(&self, other: &u128) -> Option<std::cmp::Ordering> {
-        self.v.partial_cmp(&BigInt::from(*other).v)
+        (self.v.retrieve()).partial_cmp(&BigInt::from(*other).v.retrieve())
     }
 }
 
@@ -458,7 +496,9 @@ impl BitAnd for BigInt {
     type Output = BigInt;
 
     fn bitand(self, rhs: Self) -> Self::Output {
-        BigInt { v: self.v & rhs.v }
+        BigInt {
+            v: DynResidue::new(&(self.v.retrieve() & rhs.v.retrieve()), self.params()),
+        }
     }
 }
 
@@ -467,7 +507,10 @@ impl BitAnd<u16> for BigInt {
 
     fn bitand(self, rhs: u16) -> Self::Output {
         BigInt {
-            v: self.v & BigInt::from(rhs).v,
+            v: DynResidue::new(
+                &(self.v.retrieve() & BigInt::from(rhs).v.retrieve()),
+                self.params(),
+            ),
         }
     }
 }
@@ -477,7 +520,10 @@ impl BitAnd<i32> for BigInt {
 
     fn bitand(self, rhs: i32) -> Self::Output {
         BigInt {
-            v: self.v & BigInt::from(rhs).v,
+            v: DynResidue::new(
+                &(self.v.retrieve() & BigInt::from(rhs).v.retrieve()),
+                self.params(),
+            ),
         }
     }
 }
@@ -487,7 +533,10 @@ impl BitAnd<u32> for BigInt {
 
     fn bitand(self, rhs: u32) -> Self::Output {
         BigInt {
-            v: self.v & BigInt::from(rhs).v,
+            v: DynResidue::new(
+                &(self.v.retrieve() & BigInt::from(rhs).v.retrieve()),
+                self.params(),
+            ),
         }
     }
 }
@@ -497,7 +546,10 @@ impl BitAnd<u64> for BigInt {
 
     fn bitand(self, rhs: u64) -> Self::Output {
         BigInt {
-            v: self.v & BigInt::from(rhs).v,
+            v: DynResidue::new(
+                &(self.v.retrieve() & BigInt::from(rhs).v.retrieve()),
+                self.params(),
+            ),
         }
     }
 }
@@ -507,7 +559,10 @@ impl BitAnd<u128> for BigInt {
 
     fn bitand(self, rhs: u128) -> Self::Output {
         BigInt {
-            v: self.v & BigInt::from(rhs).v,
+            v: DynResidue::new(
+                &(self.v.retrieve() & BigInt::from(rhs).v.retrieve()),
+                self.params(),
+            ),
         }
     }
 }
@@ -516,7 +571,9 @@ impl BitOr for BigInt {
     type Output = BigInt;
 
     fn bitor(self, rhs: Self) -> Self::Output {
-        BigInt { v: self.v | rhs.v }
+        BigInt {
+            v: DynResidue::new(&(self.v.retrieve() | rhs.v.retrieve()), self.params()),
+        }
     }
 }
 
@@ -525,7 +582,10 @@ impl BitOr<u16> for BigInt {
 
     fn bitor(self, rhs: u16) -> Self::Output {
         BigInt {
-            v: self.v | BigInt::from(rhs).v,
+            v: DynResidue::new(
+                &(self.v.retrieve() | BigInt::from(rhs).v.retrieve()),
+                self.params(),
+            ),
         }
     }
 }
@@ -535,7 +595,10 @@ impl BitOr<i32> for BigInt {
 
     fn bitor(self, rhs: i32) -> Self::Output {
         BigInt {
-            v: self.v | BigInt::from(rhs).v,
+            v: DynResidue::new(
+                &(self.v.retrieve() | BigInt::from(rhs).v.retrieve()),
+                self.params(),
+            ),
         }
     }
 }
@@ -545,7 +608,10 @@ impl BitOr<u32> for BigInt {
 
     fn bitor(self, rhs: u32) -> Self::Output {
         BigInt {
-            v: self.v | BigInt::from(rhs).v,
+            v: DynResidue::new(
+                &(self.v.retrieve() | BigInt::from(rhs).v.retrieve()),
+                self.params(),
+            ),
         }
     }
 }
@@ -555,7 +621,10 @@ impl BitOr<u64> for BigInt {
 
     fn bitor(self, rhs: u64) -> Self::Output {
         BigInt {
-            v: self.v | BigInt::from(rhs).v,
+            v: DynResidue::new(
+                &(self.v.retrieve() | BigInt::from(rhs).v.retrieve()),
+                self.params(),
+            ),
         }
     }
 }
@@ -565,7 +634,10 @@ impl BitOr<u128> for BigInt {
 
     fn bitor(self, rhs: u128) -> Self::Output {
         BigInt {
-            v: self.v | BigInt::from(rhs).v,
+            v: DynResidue::new(
+                &(self.v.retrieve() | BigInt::from(rhs).v.retrieve()),
+                self.params(),
+            ),
         }
     }
 }
@@ -574,7 +646,9 @@ impl Shl<usize> for BigInt {
     type Output = BigInt;
 
     fn shl(self, rhs: usize) -> Self::Output {
-        BigInt { v: self.v << rhs }
+        BigInt {
+            v: DynResidue::new(&self.v.retrieve().shl_vartime(rhs), self.params()),
+        }
     }
 }
 
@@ -582,7 +656,9 @@ impl Shr<usize> for BigInt {
     type Output = BigInt;
 
     fn shr(self, rhs: usize) -> Self::Output {
-        BigInt { v: self.v >> rhs }
+        BigInt {
+            v: DynResidue::new(&self.v.retrieve().shr_vartime(rhs), self.params()),
+        }
     }
 }
 
@@ -603,6 +679,7 @@ impl Display for BigInt {
         // concatenate bytes to string representation
         let str: String = self
             .v
+            .retrieve()
             .to_words()
             .iter()
             .rev()
@@ -635,20 +712,33 @@ mod tests {
                     BigInt::from(x).mod_exp(BigInt::from(y), BigInt::from(N))
                 );
             })
-        })
+        });
+    }
+
+    #[test]
+    fn test_mul() {
+        let a = BigInt::from(8);
+        let b = BigInt::from(10);
+        println!("{}", a * b);
+    }
+
+    #[test]
+    fn test_is_even() {
+        let a = BigInt::from(1 << 12);
+        assert!(a.is_even());
     }
 
     #[test]
     fn test_division() {
         let a = BigInt::from(8);
         let b = BigInt::from(10);
-        println!("{}", a / b);
+        assert_eq!(a / b, BigInt::from(0))
     }
 
     #[test]
     fn test_rem() {
         let a = BigInt::from(10);
-        println!("{}", a.rem(BigInt::from(4)));
+        assert_eq!(a.rem(BigInt::from(4)), BigInt::from(2));
     }
 
     #[test]
@@ -658,11 +748,8 @@ mod tests {
     }
 
     #[test]
-    fn test_sub_mod() {
-        let a = BigInt::from(72);
-        let b = BigInt::from(73);
-        let N = BigInt::from(1890);
-
-        println!("{}", a.sub_mod(b, N));
+    fn test_shr() {
+        let a = BigInt::from(1);
+        println!("{}", a >> 1);
     }
 }

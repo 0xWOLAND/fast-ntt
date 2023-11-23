@@ -6,19 +6,29 @@ fn miller_test(mut d: BigInt, n: BigInt, x: BigInt) -> bool {
     let a = BigInt::from(2) + x;
 
     let mut x = a.mod_exp(d, n);
+    match x.set_mod(n) {
+        Ok(()) => (),
+        Err(_) => return false,
+    };
+    match d.set_mod(n) {
+        Ok(()) => (),
+        Err(_) => return false,
+    };
 
     if x == one || x == n - one {
         return true;
     }
 
-    while d != n - one {
-        x = (x * x).rem(n);
+    // (d + 1) mod n = 0
+    while !(d + one).is_zero() {
+        // x = x * x mod n
+        x = x * x;
         d *= two;
 
         if x == one {
             return false;
         }
-        if x == n - one {
+        if (x + one).is_zero() {
             return true;
         }
     }
@@ -27,9 +37,7 @@ fn miller_test(mut d: BigInt, n: BigInt, x: BigInt) -> bool {
 }
 
 pub fn is_prime(num: BigInt) -> bool {
-    let zero = BigInt::from(0);
     let one = BigInt::from(1);
-    let two = BigInt::from(2);
     if num <= one || num == BigInt::from(4) {
         return false;
     }
@@ -38,7 +46,7 @@ pub fn is_prime(num: BigInt) -> bool {
     }
 
     let mut d = num - one;
-    while d.rem(two) == zero {
+    while d.is_even() && !d.is_zero() {
         d >>= 1;
     }
 

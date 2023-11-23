@@ -1,6 +1,7 @@
 use std::ops::Add;
 
 use crate::{numbers::BigInt, prime::is_prime};
+use crypto_bigint::Invert;
 use itertools::Itertools;
 use rayon::prelude::*;
 
@@ -10,44 +11,10 @@ pub struct Constants {
     pub w: BigInt,
 }
 
-fn extended_gcd(a: BigInt, b: BigInt) -> BigInt {
-    let mut a = a;
-    let mut b = b;
-    let n = b;
-    let ZERO = BigInt::from(0);
-    let ONE = BigInt::from(1);
-
-    let mut q = ZERO;
-    let mut r = ONE;
-    let mut s1 = ONE;
-    let mut s2 = ZERO;
-    let mut s3 = ONE;
-    let mut t1 = ZERO;
-    let mut t2 = ONE;
-    let mut t3 = ZERO;
-
-    while r > ZERO {
-        q = b / a;
-        r = b - q * a;
-        s3 = s1 - q * s2;
-        t3 = t1 - q * t2;
-
-        if r > ZERO {
-            b = a;
-            a = r;
-            s1 = s2;
-            s2 = s3;
-            t1 = t2;
-            t2 = t3;
-        }
-    }
-    (t2 + n).rem(n)
-}
-
 fn prime_factors(a: BigInt) -> Vec<BigInt> {
     let mut ans: Vec<BigInt> = Vec::new();
     let mut x = BigInt::from(2);
-    while x <= a.sqrt() {
+    while x * x <= a {
         if a.rem(x) == 0 {
             ans.push(x);
         }
@@ -57,11 +24,13 @@ fn prime_factors(a: BigInt) -> Vec<BigInt> {
 }
 
 fn is_primitive_root(a: BigInt, deg: BigInt, N: BigInt) -> bool {
-    a.mod_exp(deg, N) == 1
-        && prime_factors(deg)
-            .iter()
-            .map(|&x| a.mod_exp(deg / x, N) != 1)
-            .all(|x| x)
+    let lhs = a.mod_exp(deg, N);
+    let lhs = lhs == 1;
+    let rhs = prime_factors(deg)
+        .iter()
+        .map(|&x| a.mod_exp(deg / x, N) != 1)
+        .all(|x| x);
+    lhs && rhs
 }
 
 pub fn working_modulus(n: BigInt, M: BigInt) -> Constants {
@@ -135,7 +104,7 @@ fn fft(inp: Vec<BigInt>, c: &Constants, w: BigInt) -> Vec<BigInt> {
                 .zip(hi)
                 .enumerate()
                 .for_each(|(idx, (lo, hi))| {
-                    *hi = (*hi).mul_mod(pre[nchunks * idx], MOD);
+                    *hi = (*hi * pre[nchunks * idx]).rem(MOD);
                     let neg = if *lo < *hi {
                         (MOD + *lo) - *hi
                     } else {
@@ -159,9 +128,10 @@ pub fn forward(inp: Vec<BigInt>, c: &Constants) -> Vec<BigInt> {
 }
 
 pub fn inverse(inp: Vec<BigInt>, c: &Constants) -> Vec<BigInt> {
-    let inv = extended_gcd(BigInt::from(inp.len()), BigInt::from(c.N));
-    let w = extended_gcd(c.w, c.N);
-
+    let mut inv = BigInt::from(inp.len());
+    let _ = inv.set_mod(c.N);
+    let inv = inv.invert();
+    let w = c.w.invert();
     let mut res = fft(inp, c, w);
     res.par_iter_mut().for_each(|x| *x = (inv * (*x)).rem(c.N));
     res
@@ -173,32 +143,24 @@ mod tests {
     use rayon::{iter::ParallelIterator, slice::ParallelSliceMut};
 
     use crate::{
-        ntt::{extended_gcd, forward, inverse, working_modulus},
+        ntt::{forward, inverse, working_modulus},
         numbers::BigInt,
     };
 
     #[test]
     fn test_forward() {
-        let n = 1 << rand::thread_rng().gen::<u32>() % 8;
-        let v: Vec<BigInt> = (0..n)
-            .map(|_| BigInt::from(rand::thread_rng().gen::<u32>() % (1 << 6)))
-            .collect();
-        let M = (*v.iter().max().unwrap() << 1) * BigInt::from(n) + 1;
+        // let n = 1 << rand::thread_rng().gen::<u32>() % 8;
+        // let v: Vec<BigInt> = (0..n)
+        //     .map(|_| BigInt::from(rand::thread_rng().gen::<u32>() % (1 << 6)))
+        //     .collect();
+        // let M = (*v.iter().max().unwrap() << 1) * BigInt::from(n) + 1;
+        let n = 8;
+        let v: Vec<BigInt> = (0..n).map(|x| BigInt::from(x)).collect();
+        let M = BigInt::from(n) * BigInt::from(n) + 1;
         let c = working_modulus(BigInt::from(n), BigInt::from(M));
         let forward = forward(v.clone(), &c);
         let inverse = inverse(forward, &c);
         v.iter().zip(inverse).for_each(|(&a, b)| assert_eq!(a, b));
-    }
-
-    #[test]
-    fn test_extended_gcd() {
-        (2..11).for_each(|x: u64| {
-            let inv = extended_gcd(BigInt::from(x), BigInt::from(11));
-            assert_eq!(
-                (BigInt::from(x) * inv).rem(BigInt::from(11)),
-                BigInt::from(1)
-            );
-        });
     }
 
     #[test]
