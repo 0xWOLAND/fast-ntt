@@ -50,6 +50,7 @@ impl Polynomial {
         Polynomial { coef: out }
     }
 
+    #[cfg(feature = "parallel")]
     pub fn mul(self, rhs: Polynomial, c: &Constants) -> Polynomial {
         let v1_deg = self.degree();
         let v2_deg = rhs.degree();
@@ -70,6 +71,38 @@ impl Polynomial {
 
         let mut mul = vec![ZERO; n as usize];
         mul.par_iter_mut()
+            .enumerate()
+            .for_each(|(i, x)| *x = (a_forward[i] * b_forward[i]).rem(c.N));
+
+        let coef = inverse(mul, &c);
+        // n - polynomial degree - 1
+        let start = n - (v1_deg + v2_deg + 1) - 1;
+        Polynomial {
+            coef: coef[start..=(start + v1_deg + v2_deg)].to_vec(),
+        }
+    }
+
+    #[cfg(not(feature = "parallel"))]
+    pub fn mul(self, rhs: Polynomial, c: &Constants) -> Polynomial {
+        let v1_deg = self.degree();
+        let v2_deg = rhs.degree();
+        let n = (self.len() + rhs.len()).next_power_of_two();
+        let ZERO = BigInt::from(0);
+
+        let v1 = vec![ZERO; n - self.len()]
+            .into_iter()
+            .chain(self.coef.into_iter())
+            .collect();
+        let v2 = vec![ZERO; n - rhs.len()]
+            .into_iter()
+            .chain(rhs.coef.into_iter())
+            .collect();
+
+        let a_forward = forward(v1, &c);
+        let b_forward = forward(v2, &c);
+
+        let mut mul = vec![ZERO; n as usize];
+        mul.iter_mut()
             .enumerate()
             .for_each(|(i, x)| *x = (a_forward[i] * b_forward[i]).rem(c.N));
 

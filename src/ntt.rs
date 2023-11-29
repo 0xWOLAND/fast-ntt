@@ -73,6 +73,7 @@ fn order_reverse(inp: &mut Vec<BigInt>) {
     });
 }
 
+#[cfg(feature = "parallel")]
 fn fft(inp: Vec<BigInt>, c: &Constants, w: BigInt) -> Vec<BigInt> {
     assert!(inp.len().is_power_of_two());
     let mut inp = inp.clone();
@@ -123,10 +124,62 @@ fn fft(inp: Vec<BigInt>, c: &Constants, w: BigInt) -> Vec<BigInt> {
     inp
 }
 
+#[cfg(not(feature = "parallel"))]
+fn fft(inp: Vec<BigInt>, c: &Constants, w: BigInt) -> Vec<BigInt> {
+    assert!(inp.len().is_power_of_two());
+    let mut inp = inp.clone();
+    let N = inp.len();
+    let MOD = BigInt::from(c.N);
+    let ONE = BigInt::from(1);
+    let mut pre: Vec<BigInt> = vec![ONE; N / 2];
+    let CHUNK_COUNT = 128;
+    let chunk_count = BigInt::from(CHUNK_COUNT);
+
+    pre.chunks_mut(CHUNK_COUNT)
+        .enumerate()
+        .for_each(|(i, arr)| arr[0] = w.mod_exp(BigInt::from(i) * chunk_count, MOD));
+    pre.chunks_mut(CHUNK_COUNT).for_each(|x| {
+        (1..x.len()).for_each(|y| {
+            let _x = x.to_vec();
+            x[y] = (w * x[y - 1]).rem(MOD);
+        })
+    });
+    order_reverse(&mut inp);
+
+    let mut gap = 1;
+
+    while gap < inp.len() {
+        let nchunks = inp.len() / (2 * gap);
+        inp.chunks_mut(2 * gap).for_each(|cxi| {
+            let (lo, hi) = cxi.split_at_mut(gap);
+            lo.iter_mut()
+                .zip(hi)
+                .enumerate()
+                .for_each(|(idx, (lo, hi))| {
+                    *hi = (*hi * pre[nchunks * idx]).rem(MOD);
+                    let neg = if *lo < *hi {
+                        (MOD + *lo) - *hi
+                    } else {
+                        *lo - *hi
+                    };
+                    *lo = if *lo + *hi >= MOD {
+                        (*lo + *hi) - MOD
+                    } else {
+                        *lo + *hi
+                    };
+                    *hi = neg;
+                });
+        });
+        gap *= 2;
+    }
+    inp
+}
+
 pub fn forward(inp: Vec<BigInt>, c: &Constants) -> Vec<BigInt> {
     fft(inp, c, c.w)
 }
 
+#[cfg(feature = "parallel")]
 pub fn inverse(inp: Vec<BigInt>, c: &Constants) -> Vec<BigInt> {
     let mut inv = BigInt::from(inp.len());
     let _ = inv.set_mod(c.N);
@@ -134,6 +187,17 @@ pub fn inverse(inp: Vec<BigInt>, c: &Constants) -> Vec<BigInt> {
     let w = c.w.invert();
     let mut res = fft(inp, c, w);
     res.par_iter_mut().for_each(|x| *x = (inv * (*x)).rem(c.N));
+    res
+}
+
+#[cfg(not(feature = "parallel"))]
+pub fn inverse(inp: Vec<BigInt>, c: &Constants) -> Vec<BigInt> {
+    let mut inv = BigInt::from(inp.len());
+    let _ = inv.set_mod(c.N);
+    let inv = inv.invert();
+    let w = c.w.invert();
+    let mut res = fft(inp, c, w);
+    res.iter_mut().for_each(|x| *x = (inv * (*x)).rem(c.N));
     res
 }
 
