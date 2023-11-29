@@ -75,6 +75,12 @@ impl BigInt {
         *self.v.params()
     }
 
+    pub fn pow(&self, n: u128) -> BigInt {
+        BigInt {
+            v: self.v.pow(&Uint::<4>::from_u128(n)),
+        }
+    }
+
     pub fn mod_exp(&self, exp: BigInt, M: BigInt) -> BigInt {
         let mut res: BigInt = if !exp.is_even() {
             self.clone()
