@@ -31,9 +31,9 @@ Generate benchmarks using:
 
 ```bash
 # If you don't have it already
-cargo install cargo-criterion criterion-table
+cargo install cargo-criterion criterion-table --cfg
 
-cargo criterion --message-format=json | criterion-table > BENCHMARKS.md
+cargo criterion --message-format=json --features parallel | criterion-table > BENCHMARKS.md
 ```
 
 Benchmarks are also available [here](./BENCHMARKS.md)
