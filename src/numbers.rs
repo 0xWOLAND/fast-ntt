@@ -120,6 +120,14 @@ impl BigInt {
         let is_odd: bool = self.v.retrieve().bit(0).into();
         !is_odd
     }
+
+    pub fn to_u32(&self) -> Result<u32, String> {
+        let ret = self.v.retrieve().as_words()[0] as u32;
+        if BigInt::from(ret) != *self {
+            return Err(format!("Overflow error -- {} exceeds u32 size limits", self).to_string());
+        }
+        Ok(ret)
+    }
 }
 
 impl From<u16> for BigInt {
