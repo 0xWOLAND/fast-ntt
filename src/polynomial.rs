@@ -89,6 +89,9 @@ impl Polynomial {
         let n = (self.len() + rhs.len()).next_power_of_two();
         let ZERO = BigInt::from(0);
 
+        println!("rhs -- {}", self);
+        println!("lhs -- {}", rhs);
+
         let v1 = vec![ZERO; n - self.len()]
             .into_iter()
             .chain(self.coef.into_iter())
@@ -109,9 +112,11 @@ impl Polynomial {
         let coef = inverse(mul, &c);
         // n - polynomial degree - 1
         let start = n - (v1_deg + v2_deg + 1) - 1;
-        Polynomial {
+        let res = Polynomial {
             coef: coef[start..=(start + v1_deg + v2_deg)].to_vec(),
-        }
+        };
+        println!("poly -- {}", res);
+        res
     }
 
     pub fn diff(mut self) -> Self {
@@ -133,6 +138,18 @@ impl Polynomial {
     pub fn degree(&self) -> usize {
         let start = self.coef.iter().position(|&x| x != 0).unwrap();
         self.len() - start - 1
+    }
+
+    pub fn max(&self) -> BigInt {
+        let mut ans = self.coef[0];
+
+        self.coef[1..].iter().for_each(|&x| {
+            if ans < x {
+                ans = x;
+            }
+        });
+
+        ans
     }
 }
 
@@ -195,7 +212,10 @@ mod tests {
     use rand::Rng;
 
     use super::Polynomial;
-    use crate::{ntt::working_modulus, numbers::BigInt};
+    use crate::{
+        ntt::{working_modulus, Constants},
+        numbers::BigInt,
+    };
 
     #[test]
     fn add() {
@@ -240,5 +260,16 @@ mod tests {
         let a = Polynomial::new(vec![3, 2, 1].iter().map(|&x| BigInt::from(x)).collect());
         let da = a.diff();
         println!("{}", da);
+    }
+
+    #[test]
+    fn test_comparator() {
+        let a = BigInt::from(550338105);
+        let b = BigInt::from(1);
+        assert!(a > b);
+        let p = Polynomial::new(vec![a, b]);
+        let hi = p.max();
+
+        assert_eq!(a, hi);
     }
 }

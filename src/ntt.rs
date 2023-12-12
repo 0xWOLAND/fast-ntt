@@ -23,6 +23,18 @@ fn prime_factors(a: BigInt) -> Vec<BigInt> {
     ans
 }
 
+#[cfg(feature = "parallel")]
+fn is_primitive_root(a: BigInt, deg: BigInt, N: BigInt) -> bool {
+    let lhs = a.mod_exp(deg, N);
+    let lhs = lhs == 1;
+    let rhs = prime_factors(deg)
+        .par_iter()
+        .map(|&x| a.mod_exp(deg / x, N) != 1)
+        .all(|x| x);
+    lhs && rhs
+}
+
+#[cfg(not(feature = "parallel"))]
 fn is_primitive_root(a: BigInt, deg: BigInt, N: BigInt) -> bool {
     let lhs = a.mod_exp(deg, N);
     let lhs = lhs == 1;
@@ -34,25 +46,30 @@ fn is_primitive_root(a: BigInt, deg: BigInt, N: BigInt) -> bool {
 }
 
 pub fn working_modulus(n: BigInt, M: BigInt) -> Constants {
-    let mut N = n + 1;
-    let mut k = BigInt::from(1);
-    while !(is_prime(N) && N >= M) {
-        k += 1;
-        N = k * n + 1;
+    let ONE = BigInt::from(1);
+    let mut N = M;
+    if N >= ONE {
+        N = N * n + 1;
+        while !is_prime(N) {
+            println!("N -- {}", N);
+            N += n;
+        }
     }
+    println!("{} is prime", N);
+    let totient = N - ONE;
     assert!(N >= M);
     let mut gen = BigInt::from(0);
-    let ONE = BigInt::from(1);
     let mut g = BigInt::from(2);
     while g < N {
-        if is_primitive_root(g, N - 1, N) {
+        if is_primitive_root(g, totient, N) {
             gen = g;
             break;
         }
         g += ONE;
     }
     assert!(gen > 0);
-    let w = gen.mod_exp(k, N);
+    println!("g/gen -- {} {}", g, gen);
+    let w = gen.mod_exp(totient / n, N);
     Constants { N, w }
 }
 
