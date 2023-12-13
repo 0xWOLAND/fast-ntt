@@ -89,9 +89,6 @@ impl Polynomial {
         let n = (self.len() + rhs.len()).next_power_of_two();
         let ZERO = BigInt::from(0);
 
-        println!("rhs -- {}", self);
-        println!("lhs -- {}", rhs);
-
         let v1 = vec![ZERO; n - self.len()]
             .into_iter()
             .chain(self.coef.into_iter())
@@ -115,7 +112,6 @@ impl Polynomial {
         let res = Polynomial {
             coef: coef[start..=(start + v1_deg + v2_deg)].to_vec(),
         };
-        println!("poly -- {}", res);
         res
     }
 

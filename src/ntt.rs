@@ -51,11 +51,9 @@ pub fn working_modulus(n: BigInt, M: BigInt) -> Constants {
     if N >= ONE {
         N = N * n + 1;
         while !is_prime(N) {
-            println!("N -- {}", N);
             N += n;
         }
     }
-    println!("{} is prime", N);
     let totient = N - ONE;
     assert!(N >= M);
     let mut gen = BigInt::from(0);
@@ -68,7 +66,6 @@ pub fn working_modulus(n: BigInt, M: BigInt) -> Constants {
         g += ONE;
     }
     assert!(gen > 0);
-    println!("g/gen -- {} {}", g, gen);
     let w = gen.mod_exp(totient / n, N);
     Constants { N, w }
 }
