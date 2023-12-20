@@ -18,11 +18,24 @@ use crypto_bigint::{
 use itertools::Itertools;
 use rand::{thread_rng, Error, Rng};
 
+use crate::polynomial::PolynomialFieldElement;
+
 pub enum BigIntType {
     U16(u16),
     U32(u32),
     U64(u64),
     U128(u128),
+}
+
+pub trait NttFieldElement {
+    // all operations should be under the modular group `M`
+    fn set_mod(&mut self, M: Self) -> Result<(), String>;
+    fn rem(&self, M: Self) -> Self;
+    fn pow(&self, n: u128) -> Self;
+    fn mod_exp(&self, exp: Self, M: Self) -> Self;
+    fn is_even(&self) -> bool;
+    fn is_zero(&self) -> bool;
+    fn to_bigint(&self) -> BigInt;
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -127,6 +140,74 @@ impl BigInt {
             return Err(format!("Overflow error -- {} exceeds u32 size limits", self).to_string());
         }
         Ok(ret)
+    }
+}
+
+impl NttFieldElement for BigInt {
+    fn set_mod(&mut self, M: Self) -> Result<(), String> {
+        if M.is_even() {
+            return Err("modulus must be odd".to_string());
+        }
+        let params = DynResidueParams::new(&(U256::from(M.v.retrieve())));
+        self.v = DynResidue::new(&self.v.retrieve(), params);
+        Ok(())
+    }
+
+    fn rem(&self, M: Self) -> BigInt {
+        let mut res = self.clone();
+        if res < M {
+            return res;
+        }
+        res.v = DynResidue::new(
+            &res.v.retrieve().rem(&NonZero::from_uint(M.v.retrieve())),
+            res.params(),
+        );
+        res
+    }
+
+    fn pow(&self, n: u128) -> BigInt {
+        BigInt {
+            v: self.v.pow(&Uint::<4>::from_u128(n)),
+        }
+    }
+
+    fn mod_exp(&self, exp: BigInt, M: BigInt) -> BigInt {
+        let mut res: BigInt = if !exp.is_even() {
+            self.clone()
+        } else {
+            BigInt::from(1)
+        };
+        let mut b = self.clone();
+        let mut e = exp.clone();
+        res.set_mod(M);
+        b.set_mod(M);
+        while e > 0 {
+            e >>= 1;
+            b = b * b;
+            if M.is_even() {
+                b = b.rem(M);
+            }
+            if !e.is_even() && !e.is_zero() {
+                res = b * res;
+                if M.is_even() {
+                    res = res.rem(M);
+                }
+            }
+        }
+        res
+    }
+
+    fn is_zero(&self) -> bool {
+        self.v.retrieve().bits() == 0
+    }
+
+    fn is_even(&self) -> bool {
+        let is_odd: bool = self.v.retrieve().bit(0).into();
+        !is_odd
+    }
+
+    fn to_bigint(&self) -> BigInt {
+        *self
     }
 }
 
@@ -710,6 +791,8 @@ impl Display for BigInt {
         write!(f, "{}", trimmed)
     }
 }
+
+impl PolynomialFieldElement for BigInt {}
 
 #[cfg(test)]
 mod tests {

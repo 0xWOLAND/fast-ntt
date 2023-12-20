@@ -1,63 +1,66 @@
-use std::ops::Add;
-
-use crate::{numbers::BigInt, prime::is_prime};
+use crate::{numbers::BigInt, polynomial::PolynomialFieldElement, prime::is_prime};
 use crypto_bigint::Invert;
 use itertools::Itertools;
 use rayon::prelude::*;
 
 #[derive(Debug, Clone)]
-pub struct Constants {
-    pub N: BigInt,
-    pub w: BigInt,
+pub struct Constants<T: PolynomialFieldElement> {
+    pub N: T,
+    pub w: T,
 }
 
-fn prime_factors(a: BigInt) -> Vec<BigInt> {
-    let mut ans: Vec<BigInt> = Vec::new();
-    let mut x = BigInt::from(2);
+fn prime_factors<T: PolynomialFieldElement>(a: T) -> Vec<T> {
+    let mut ans: Vec<T> = Vec::new();
+    let ZERO = T::from(0);
+    let ONE = T::from(1);
+    let mut x = T::from(2);
     while x * x <= a {
-        if a.rem(x) == 0 {
+        if a.rem(x) == ZERO {
             ans.push(x);
         }
-        x += 1;
+        x += ONE;
     }
     ans
 }
 
 #[cfg(feature = "parallel")]
-fn is_primitive_root(a: BigInt, deg: BigInt, N: BigInt) -> bool {
+fn is_primitive_root<T: PolynomialFieldElement>(a: T, deg: T, N: T) -> bool {
     let lhs = a.mod_exp(deg, N);
-    let lhs = lhs == 1;
+    let ONE = T::from(1);
+    let lhs = lhs == ONE;
     let rhs = prime_factors(deg)
         .par_iter()
-        .map(|&x| a.mod_exp(deg / x, N) != 1)
+        .map(|&x| a.mod_exp(deg / x, N) != ONE)
         .all(|x| x);
     lhs && rhs
 }
 
 #[cfg(not(feature = "parallel"))]
-fn is_primitive_root(a: BigInt, deg: BigInt, N: BigInt) -> bool {
+fn is_primitive_root<T: PolynomialFieldElement>(a: T, deg: T, N: T) -> bool {
     let lhs = a.mod_exp(deg, N);
-    let lhs = lhs == 1;
+    let ONE = T::from(1);
+    let lhs = lhs == ONE;
     let rhs = prime_factors(deg)
         .iter()
-        .map(|&x| a.mod_exp(deg / x, N) != 1)
+        .map(|&x| a.mod_exp(deg / x, N) != ONE)
         .all(|x| x);
     lhs && rhs
 }
 
-pub fn working_modulus(n: BigInt, M: BigInt) -> Constants {
-    let ONE = BigInt::from(1);
+pub fn working_modulus<T: PolynomialFieldElement>(n: T, M: T) -> Constants<T> {
+    let ZERO = T::from(0);
+    let ONE = T::from(1);
     let mut N = M;
     if N >= ONE {
-        N = N * n + 1;
+        N = N * n + ONE;
         while !is_prime(N) {
             N += n;
         }
     }
     let totient = N - ONE;
     assert!(N >= M);
-    let mut gen = BigInt::from(0);
-    let mut g = BigInt::from(2);
+    let mut gen = T::from(0);
+    let mut g = T::from(2);
     while g < N {
         if is_primitive_root(g, totient, N) {
             gen = g;
@@ -65,12 +68,12 @@ pub fn working_modulus(n: BigInt, M: BigInt) -> Constants {
         }
         g += ONE;
     }
-    assert!(gen > 0);
+    assert!(gen > ZERO);
     let w = gen.mod_exp(totient / n, N);
     Constants { N, w }
 }
 
-fn order_reverse(inp: &mut Vec<BigInt>) {
+fn order_reverse<T: PolynomialFieldElement>(inp: &mut Vec<T>) {
     let mut j = 0;
     let n = inp.len();
     (1..n).for_each(|i| {
@@ -88,19 +91,19 @@ fn order_reverse(inp: &mut Vec<BigInt>) {
 }
 
 #[cfg(feature = "parallel")]
-fn fft(inp: Vec<BigInt>, c: &Constants, w: BigInt) -> Vec<BigInt> {
+fn fft<T: PolynomialFieldElement>(inp: Vec<T>, c: &Constants<T>, w: T) -> Vec<T> {
     assert!(inp.len().is_power_of_two());
     let mut inp = inp.clone();
     let N = inp.len();
-    let MOD = BigInt::from(c.N);
-    let ONE = BigInt::from(1);
-    let mut pre: Vec<BigInt> = vec![ONE; N / 2];
+    let MOD = T::from(c.N);
+    let ONE = T::from(1);
+    let mut pre: Vec<T> = vec![ONE; N / 2];
     let CHUNK_COUNT = 128;
-    let chunk_count = BigInt::from(CHUNK_COUNT);
+    let chunk_count = T::from(CHUNK_COUNT);
 
     pre.par_chunks_mut(CHUNK_COUNT)
         .enumerate()
-        .for_each(|(i, arr)| arr[0] = w.mod_exp(BigInt::from(i) * chunk_count, MOD));
+        .for_each(|(i, arr)| arr[0] = w.mod_exp(T::from(i) * chunk_count, MOD));
     pre.par_chunks_mut(CHUNK_COUNT).for_each(|x| {
         (1..x.len()).for_each(|y| {
             let _x = x.to_vec();
@@ -139,19 +142,19 @@ fn fft(inp: Vec<BigInt>, c: &Constants, w: BigInt) -> Vec<BigInt> {
 }
 
 #[cfg(not(feature = "parallel"))]
-fn fft(inp: Vec<BigInt>, c: &Constants, w: BigInt) -> Vec<BigInt> {
+fn fft<T: PolynomialFieldElement>(inp: Vec<T>, c: &Constants<T>, w: T) -> Vec<T> {
     assert!(inp.len().is_power_of_two());
     let mut inp = inp.clone();
     let N = inp.len();
-    let MOD = BigInt::from(c.N);
-    let ONE = BigInt::from(1);
-    let mut pre: Vec<BigInt> = vec![ONE; N / 2];
+    let MOD = T::from(c.N);
+    let ONE = T::from(1);
+    let mut pre: Vec<T> = vec![ONE; N / 2];
     let CHUNK_COUNT = 128;
-    let chunk_count = BigInt::from(CHUNK_COUNT);
+    let chunk_count = T::from(CHUNK_COUNT);
 
     pre.chunks_mut(CHUNK_COUNT)
         .enumerate()
-        .for_each(|(i, arr)| arr[0] = w.mod_exp(BigInt::from(i) * chunk_count, MOD));
+        .for_each(|(i, arr)| arr[0] = w.mod_exp(T::from(i) * chunk_count, MOD));
     pre.chunks_mut(CHUNK_COUNT).for_each(|x| {
         (1..x.len()).for_each(|y| {
             let _x = x.to_vec();
@@ -189,13 +192,13 @@ fn fft(inp: Vec<BigInt>, c: &Constants, w: BigInt) -> Vec<BigInt> {
     inp
 }
 
-pub fn forward(inp: Vec<BigInt>, c: &Constants) -> Vec<BigInt> {
+pub fn forward<T: PolynomialFieldElement>(inp: Vec<T>, c: &Constants<T>) -> Vec<T> {
     fft(inp, c, c.w)
 }
 
 #[cfg(feature = "parallel")]
-pub fn inverse(inp: Vec<BigInt>, c: &Constants) -> Vec<BigInt> {
-    let mut inv = BigInt::from(inp.len());
+pub fn inverse<T: PolynomialFieldElement>(inp: Vec<T>, c: &Constants<T>) -> Vec<T> {
+    let mut inv = T::from(inp.len());
     let _ = inv.set_mod(c.N);
     let inv = inv.invert();
     let w = c.w.invert();
@@ -205,8 +208,8 @@ pub fn inverse(inp: Vec<BigInt>, c: &Constants) -> Vec<BigInt> {
 }
 
 #[cfg(not(feature = "parallel"))]
-pub fn inverse(inp: Vec<BigInt>, c: &Constants) -> Vec<BigInt> {
-    let mut inv = BigInt::from(inp.len());
+pub fn inverse<T: PolynomialFieldElement>(inp: Vec<T>, c: &Constants<T>) -> Vec<T> {
+    let mut inv = T::from(inp.len());
     let _ = inv.set_mod(c.N);
     let inv = inv.invert();
     let w = c.w.invert();
