@@ -41,12 +41,12 @@ pub trait PolynomialFieldElement:
 }
 
 pub trait PolynomialTrait<T: PolynomialFieldElement> {
-    fn new(coef: Vec<T>) -> Self;
     fn len(&self) -> usize;
     fn max(&self) -> T;
     fn degree(&self) -> usize;
     fn to_vec(&self) -> Vec<T>;
-    fn set_coef(&mut self, idx: usize, a: T);
+    fn set_coef(&mut self, a: T, idx: usize);
+    fn set_vec(&mut self, v: Vec<T>);
 }
 
 #[derive(Debug, Clone)]
@@ -55,23 +55,6 @@ pub struct Polynomial<T: PolynomialFieldElement> {
 }
 
 impl<T: PolynomialFieldElement> PolynomialTrait<T> for Polynomial<T> {
-    fn new(coef: Vec<T>) -> Polynomial<T> {
-        let n = coef.len();
-        let ZERO = T::from(0);
-
-        // if is not power of 2
-        if !(n & (n - 1) == 0) {
-            let pad = n.next_power_of_two() - n;
-            return Polynomial {
-                coef: vec![ZERO; pad]
-                    .into_iter()
-                    .chain(coef.into_iter())
-                    .collect_vec(),
-            };
-        }
-        Polynomial { coef }
-    }
-
     fn len(&self) -> usize {
         self.coef.len()
     }
@@ -98,8 +81,18 @@ impl<T: PolynomialFieldElement> PolynomialTrait<T> for Polynomial<T> {
         self.clone().coef
     }
 
-    fn set_coef(&mut self, idx: usize, a: T) {
+    fn set_coef(&mut self, a: T, idx: usize) {
         self.coef[idx] = a;
+    }
+
+    fn set_vec(&mut self, v: Vec<T>) {
+        self.coef = v;
+    }
+}
+
+impl<T: PolynomialFieldElement> Polynomial<T> {
+    pub fn new(coef: Vec<T>) -> Self {
+        Polynomial { coef }
     }
 }
 
@@ -200,14 +193,15 @@ pub fn diff<T: PolynomialFieldElement, P: PolynomialTrait<T>>(mut poly: P) -> P 
     let N = poly.len();
     let _poly = poly.to_vec();
     for n in (1..N).rev() {
-        poly.set_coef(n, _poly[n - 1] * T::from(N - n));
+        poly.set_coef(_poly[n - 1] * T::from(N - n), n);
     }
     let ZERO = T::from(0);
-    poly.set_coef(0, ZERO);
+    poly.set_coef(ZERO, 0);
     let mut _poly = poly.to_vec();
     let start = _poly.iter().position(|&x| x != ZERO).unwrap();
     _poly = _poly[start..].to_vec();
-    P::new(_poly)
+    poly.set_vec(_poly);
+    poly
 }
 
 impl<T: PolynomialFieldElement> Add<Polynomial<T>> for Polynomial<T> {
