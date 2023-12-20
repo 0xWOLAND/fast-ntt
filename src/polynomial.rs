@@ -40,135 +40,49 @@ pub trait PolynomialFieldElement:
 {
 }
 
+pub trait PolynomialTrait<T: PolynomialFieldElement> {
+    fn new(coef: Vec<T>) -> Self;
+    fn len(&self) -> usize;
+    fn max(&self) -> T;
+    fn degree(&self) -> usize;
+    fn to_vec(&self) -> Vec<T>;
+    fn set_coef(&mut self, idx: usize, a: T);
+}
+
 #[derive(Debug, Clone)]
 pub struct Polynomial<T: PolynomialFieldElement> {
     pub coef: Vec<T>,
 }
 
-impl<T: PolynomialFieldElement> Polynomial<T> {
-    pub fn new(coef: Vec<T>) -> Self {
+impl<T: PolynomialFieldElement> PolynomialTrait<T> for Polynomial<T> {
+    fn new(coef: Vec<T>) -> Polynomial<T> {
         let n = coef.len();
-        let ZERO = T::from(0_u32);
+        let ZERO = T::from(0);
 
         // if is not power of 2
         if !(n & (n - 1) == 0) {
             let pad = n.next_power_of_two() - n;
-            return Self {
+            return Polynomial {
                 coef: vec![ZERO; pad]
                     .into_iter()
                     .chain(coef.into_iter())
                     .collect_vec(),
             };
         }
-        Self { coef }
+        Polynomial { coef }
     }
 
-    pub fn mul_brute(self, rhs: Polynomial<T>) -> Polynomial<T> {
-        let a = self.len();
-        let b = rhs.len();
-        let ZERO = T::from(0_u32);
-
-        let mut out: Vec<T> = vec![ZERO; a + b];
-
-        for i in 0..a {
-            for j in 0..b {
-                let e = i + j;
-                out[e] += self.coef[i] * rhs.coef[j];
-            }
-        }
-
-        Polynomial { coef: out }
-    }
-
-    #[cfg(feature = "parallel")]
-    pub fn mul(self, rhs: Polynomial<T>, c: &Constants<T>) -> Polynomial<T> {
-        let v1_deg = self.degree();
-        let v2_deg = rhs.degree();
-        let n = (self.len() + rhs.len()).next_power_of_two();
-        let ZERO = T::from(0);
-
-        let v1: Vec<T> = vec![ZERO; n - self.len()]
-            .into_iter()
-            .chain(self.coef.into_iter())
-            .collect();
-        let v2: Vec<T> = vec![ZERO; n - rhs.len()]
-            .into_iter()
-            .chain(rhs.coef.into_iter())
-            .collect();
-
-        let a_forward = forward(v1, &c);
-        let b_forward = forward(v2, &c);
-
-        let mut mul = vec![ZERO; n as usize];
-        mul.par_iter_mut()
-            .enumerate()
-            .for_each(|(i, x)| *x = (a_forward[i] * b_forward[i]).rem(c.N));
-
-        let coef = inverse(mul, &c);
-        // n - polynomial degree - 1
-        let start = n - (v1_deg + v2_deg + 1) - 1;
-        Polynomial {
-            coef: coef[start..=(start + v1_deg + v2_deg)].to_vec(),
-        }
-    }
-
-    #[cfg(not(feature = "parallel"))]
-    pub fn mul(self, rhs: Polynomial<T>, c: &Constants<T>) -> Polynomial<T> {
-        let v1_deg = self.degree();
-        let v2_deg = rhs.degree();
-        let n = (self.len() + rhs.len()).next_power_of_two();
-        let ZERO = T::from(0_u32);
-
-        let v1: Vec<T> = vec![ZERO; n - self.len()]
-            .into_iter()
-            .chain(self.coef.into_iter())
-            .collect();
-        let v2: Vec<T> = vec![ZERO; n - rhs.len()]
-            .into_iter()
-            .chain(rhs.coef.into_iter())
-            .collect();
-
-        let a_forward = forward(v1, &c);
-        let b_forward = forward(v2, &c);
-
-        let mut mul = vec![ZERO; n as usize];
-        mul.iter_mut()
-            .enumerate()
-            .for_each(|(i, x)| *x = (a_forward[i] * b_forward[i]).rem(c.N));
-
-        let coef = inverse(mul, &c);
-        // n - polynomial degree - 1
-        let start = n - (v1_deg + v2_deg + 1) - 1;
-        let res = Polynomial {
-            coef: coef[start..=(start + v1_deg + v2_deg)].to_vec(),
-        };
-        res
-    }
-
-    pub fn diff(mut self) -> Self {
-        let N = self.len();
-        for n in (1..N).rev() {
-            self.coef[n] = self.coef[n - 1] * T::from(N - n);
-        }
-        let ZERO = T::from(0);
-        self.coef[0] = ZERO;
-        let start = self.coef.iter().position(|&x| x != ZERO).unwrap();
-        self.coef = self.coef[start..].to_vec();
-
-        self
-    }
-
-    pub fn len(&self) -> usize {
+    fn len(&self) -> usize {
         self.coef.len()
     }
 
-    pub fn degree(&self) -> usize {
+    fn degree(&self) -> usize {
         let ZERO = T::from(0);
         let start = self.coef.iter().position(|&x| x != ZERO).unwrap();
         self.len() - start - 1
     }
 
-    pub fn max(&self) -> T {
+    fn max(&self) -> T {
         let mut ans = self.coef[0];
 
         self.coef[1..].iter().for_each(|&x| {
@@ -179,6 +93,121 @@ impl<T: PolynomialFieldElement> Polynomial<T> {
 
         ans
     }
+
+    fn to_vec(&self) -> Vec<T> {
+        self.clone().coef
+    }
+
+    fn set_coef(&mut self, idx: usize, a: T) {
+        self.coef[idx] = a;
+    }
+}
+
+pub fn mul_brute<T: PolynomialFieldElement>(
+    lhs: Polynomial<T>,
+    rhs: Polynomial<T>,
+) -> Polynomial<T> {
+    let a = lhs.len();
+    let b = rhs.len();
+    let ZERO = T::from(0_u32);
+
+    let mut out: Vec<T> = vec![ZERO; a + b];
+
+    for i in 0..a {
+        for j in 0..b {
+            let e = i + j;
+            out[e] += lhs.coef[i] * rhs.coef[j];
+        }
+    }
+
+    Polynomial { coef: out }
+}
+
+#[cfg(feature = "parallel")]
+pub fn mul<T: PolynomialFieldElement>(
+    lhs: impl PolynomialTrait<T>,
+    rhs: impl PolynomialTrait<T>,
+    c: &Constants<T>,
+) -> Polynomial<T> {
+    let v1_deg = lhs.degree();
+    let v2_deg = rhs.degree();
+    let n = (lhs.len() + rhs.len()).next_power_of_two();
+    let ZERO = T::from(0);
+
+    let v1: Vec<T> = vec![ZERO; n - lhs.len()]
+        .into_iter()
+        .chain(lhs.to_vec().into_iter())
+        .collect();
+    let v2: Vec<T> = vec![ZERO; n - rhs.len()]
+        .into_iter()
+        .chain(rhs.to_vec().into_iter())
+        .collect();
+
+    let a_forward = forward(v1, &c);
+    let b_forward = forward(v2, &c);
+
+    let mut mul = vec![ZERO; n as usize];
+    mul.par_iter_mut()
+        .enumerate()
+        .for_each(|(i, x)| *x = (a_forward[i] * b_forward[i]).rem(c.N));
+
+    let coef = inverse(mul, &c);
+    // n - polynomial degree - 1
+    let start = n - (v1_deg + v2_deg + 1) - 1;
+    Polynomial {
+        coef: coef[start..=(start + v1_deg + v2_deg)].to_vec(),
+    }
+}
+
+#[cfg(not(feature = "parallel"))]
+pub fn mul<T: PolynomialFieldElement, P: PolynomialTrait<T>>(
+    lhs: P,
+    rhs: P,
+    c: &Constants<T>,
+) -> Polynomial<T> {
+    let v1_deg = lhs.degree();
+    let v2_deg = rhs.degree();
+    let n = (lhs.len() + rhs.len()).next_power_of_two();
+    let ZERO = T::from(0_u32);
+
+    let v1: Vec<T> = vec![ZERO; n - lhs.len()]
+        .into_iter()
+        .chain(lhs.to_vec().into_iter())
+        .collect();
+    let v2: Vec<T> = vec![ZERO; n - rhs.len()]
+        .into_iter()
+        .chain(rhs.to_vec().into_iter())
+        .collect();
+
+    let a_forward = forward(v1, &c);
+    let b_forward = forward(v2, &c);
+
+    let mut mul = vec![ZERO; n as usize];
+    mul.iter_mut()
+        .enumerate()
+        .for_each(|(i, x)| *x = (a_forward[i] * b_forward[i]).rem(c.N));
+
+    let coef = inverse(mul, &c);
+    // n - polynomial degree - 1
+    let start = n - (v1_deg + v2_deg + 1) - 1;
+    let res = Polynomial {
+        coef: coef[start..=(start + v1_deg + v2_deg)].to_vec(),
+    };
+    res
+}
+
+pub fn diff<T: PolynomialFieldElement, P: PolynomialTrait<T>>(mut poly: P) -> P {
+    let N = poly.len();
+    let _poly = poly.to_vec();
+    for n in (1..N).rev() {
+        poly.set_coef(n, _poly[n - 1] * T::from(N - n));
+    }
+    let ZERO = T::from(0);
+    poly.set_coef(0, ZERO);
+    let mut _poly = poly.to_vec();
+    let start = _poly.iter().position(|&x| x != ZERO).unwrap();
+    _poly = _poly[start..].to_vec();
+    P::new(_poly)
 }
 
 impl<T: PolynomialFieldElement> Add<Polynomial<T>> for Polynomial<T> {
@@ -243,17 +272,18 @@ mod tests {
     use crate::{
         ntt::{working_modulus, Constants},
         numbers::BigInt,
+        polynomial::{diff, mul, PolynomialTrait},
     };
 
     #[test]
-    fn add() {
+    fn test_add() {
         let a = Polynomial::new(vec![1, 2, 3, 4].iter().map(|&x| BigInt::from(x)).collect());
         let b = Polynomial::new(vec![1, 2].iter().map(|&x| BigInt::from(x)).collect());
         println!("{}", a + b);
     }
 
     #[test]
-    fn mul() {
+    fn test_mul() {
         let ONE = BigInt::from(1);
         (0..10).for_each(|_| {
             let n: usize = 1 << rand::thread_rng().gen::<usize>() % (1 << 3);
@@ -278,15 +308,15 @@ mod tests {
                 + 1;
             let c = working_modulus(N, M);
 
-            // let mul = a.mul(b, &c);
-            // assert_eq!(mul[0], ONE);
+            let mul = mul(a, b, &c);
+            assert_eq!(mul[0], ONE);
         });
     }
 
     #[test]
-    fn diff() {
+    fn test_diff() {
         let a = Polynomial::new(vec![3, 2, 1].iter().map(|&x| BigInt::from(x)).collect());
-        let da = a.diff();
+        let da = diff(a);
         println!("{}", da);
     }
 
