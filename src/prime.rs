@@ -1,9 +1,9 @@
-use crate::numbers::BigInt;
+use crate::{numbers::BigInt, polynomial::PolynomialFieldElement};
 
-fn miller_test(mut d: BigInt, n: BigInt, x: BigInt) -> bool {
-    let one = BigInt::from(1);
-    let two = BigInt::from(2);
-    let a = BigInt::from(2) + x;
+fn miller_test<T: PolynomialFieldElement>(mut d: T, n: T, x: T) -> bool {
+    let ONE = T::from(1);
+    let TWO = T::from(2);
+    let a = TWO + x;
 
     let mut x = a.mod_exp(d, n);
     match x.set_mod(n) {
@@ -15,20 +15,20 @@ fn miller_test(mut d: BigInt, n: BigInt, x: BigInt) -> bool {
         Err(_) => return false,
     };
 
-    if x == one || x == n - one {
+    if x == ONE || x == n - ONE {
         return true;
     }
 
     // (d + 1) mod n = 0
-    while !(d + one).is_zero() {
+    while !(d + ONE).is_zero() {
         // x = x * x mod n
         x = x * x;
-        d *= two;
+        d *= TWO;
 
-        if x == one {
+        if x == ONE {
             return false;
         }
-        if (x + one).is_zero() {
+        if (x + ONE).is_zero() {
             return true;
         }
     }
@@ -36,22 +36,22 @@ fn miller_test(mut d: BigInt, n: BigInt, x: BigInt) -> bool {
     false
 }
 
-pub fn is_prime(num: BigInt) -> bool {
-    let one = BigInt::from(1);
-    if num <= one || num == BigInt::from(4) {
+pub fn is_prime<T: PolynomialFieldElement>(num: T) -> bool {
+    let ONE = T::from(1);
+    if num <= ONE || num == T::from(4) {
         return false;
     }
-    if num <= BigInt::from(3) {
+    if num <= T::from(3) {
         return true;
     }
 
-    let mut d = num - one;
+    let mut d = num - ONE;
     while d.is_even() && !d.is_zero() {
         d >>= 1;
     }
 
     for x in 0..4 {
-        if miller_test(d, num, BigInt::from(x)) == false {
+        if miller_test(d, num, T::from(x)) == false {
             return false;
         }
     }
