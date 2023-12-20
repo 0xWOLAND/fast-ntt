@@ -2,28 +2,28 @@ use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criteri
 use fast_ntt::{
     ntt::{forward, working_modulus, Constants},
     numbers::BigInt,
-    polynomial::Polynomial,
+    polynomial::{fast_mul, mul_brute, Polynomial, PolynomialFieldElement, PolynomialTrait},
 };
 use itertools::Itertools;
 
 const deg: usize = 16;
 
-fn bench_mul(x: usize, y: usize, c: &Constants) {
-    let ONE = BigInt::from(1);
+fn bench_mul<T: PolynomialFieldElement>(x: usize, y: usize, c: &Constants<T>) {
+    let ONE = T::from(1);
     let a = Polynomial::new(vec![0; x].iter().map(|_| ONE).collect_vec());
     let b = Polynomial::new(vec![0; y].iter().map(|_| ONE).collect_vec());
-    let _ = a.mul(b, c);
+    let _ = fast_mul(a, b, c);
 }
 
-fn bench_mul_brute(x: usize, y: usize) {
-    let ONE = BigInt::from(1);
+fn bench_mul_brute<T: PolynomialFieldElement>(x: usize, y: usize) {
+    let ONE = T::from(1);
     let a = Polynomial::new(vec![0; x].iter().map(|_| ONE).collect_vec());
     let b = Polynomial::new(vec![0; y].iter().map(|_| ONE).collect_vec());
-    let _ = a.mul_brute(b);
+    let _ = mul_brute(a, b);
 }
 
-fn bench_forward(n: usize, c: &Constants) {
-    let ONE = BigInt::from(1);
+fn bench_forward<T: PolynomialFieldElement>(n: usize, c: &Constants<T>) {
+    let ONE = T::from(1);
     let a = Polynomial::new(vec![0; n].iter().map(|_| ONE).collect_vec());
     let _ = forward(a.coef, c);
 }
@@ -53,7 +53,7 @@ fn criterion_benchmark(c: &mut Criterion) {
 
         let id = BenchmarkId::new("Brute-Force", 1 << n);
         group.bench_with_input(id, &n, |b, n| {
-            b.iter(|| bench_mul_brute(black_box(1 << n), black_box(1 << n)))
+            b.iter(|| bench_mul_brute::<BigInt>(black_box(1 << n), black_box(1 << n)))
         });
     });
 }

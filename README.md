@@ -19,7 +19,7 @@ fast-ntt is a Rust package to compute polynomial multiplication in `O(nlog(n))` 
             .collect(),
     );
     let c: Constants<BigInt> = working_modulus(N, M);
-    println!("{}", mul(a, b, c));
+    println!("{}", fast_mul(a, b, c));
 
 // Polynomial Differentiation
     let a = Polynomial::new(vec![3, 2, 1].iter().map(|&x| BigInt::from(x)).collect());

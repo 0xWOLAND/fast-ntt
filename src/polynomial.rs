@@ -124,7 +124,7 @@ pub fn mul_brute<T: PolynomialFieldElement>(
 }
 
 #[cfg(feature = "parallel")]
-pub fn mul<T: PolynomialFieldElement>(
+pub fn fast_mul<T: PolynomialFieldElement>(
     lhs: impl PolynomialTrait<T>,
     rhs: impl PolynomialTrait<T>,
     c: &Constants<T>,
@@ -160,7 +160,7 @@ pub fn mul<T: PolynomialFieldElement>(
 }
 
 #[cfg(not(feature = "parallel"))]
-pub fn mul<T: PolynomialFieldElement, P: PolynomialTrait<T>>(
+pub fn fast_mul<T: PolynomialFieldElement, P: PolynomialTrait<T>>(
     lhs: P,
     rhs: P,
     c: &Constants<T>,
@@ -272,7 +272,7 @@ mod tests {
     use crate::{
         ntt::{working_modulus, Constants},
         numbers::BigInt,
-        polynomial::{diff, mul, PolynomialTrait},
+        polynomial::{diff, fast_mul, PolynomialTrait},
     };
 
     #[test]
@@ -308,7 +308,7 @@ mod tests {
                 + 1;
             let c = working_modulus(N, M);
 
-            let mul = mul(a, b, &c);
+            let mul = fast_mul(a, b, &c);
             assert_eq!(mul[0], ONE);
         });
     }
