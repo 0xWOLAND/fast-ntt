@@ -9,6 +9,7 @@ categories = ["cryptography", "data-structures"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+concrete-ntt = "0.1.1"
 criterion = "0.5.1"
 crypto-bigint = "0.5.3"
 hex = "0.4.3"
@@ -21,7 +22,7 @@ rayon = "1.8.0"
 criterion = { version = "0.5.1", features = ["html_reports"] }
 
 [[bench]]
-name = "benchmark"
+name = "concrete"
 harness = false
 
 [features]
