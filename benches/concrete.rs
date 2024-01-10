@@ -10,7 +10,7 @@ use itertools::Itertools;
 const deg: usize = 16;
 
 fn bench_mul<T: PolynomialFieldElement>(x: usize, c: &Constants<T>) {
-    let ONE = T::from(1);
+    let ONE = T::from_i32(1, BigInt::modulus());
     let a = Polynomial::new(vec![0; x].iter().map(|_| ONE).collect_vec());
     let b = Polynomial::new(vec![0; x].iter().map(|_| ONE).collect_vec());
     let _ = fast_mul(a, b, c);
@@ -28,7 +28,7 @@ fn criterion_benchmark(c: &mut Criterion) {
 
     (6..deg).for_each(|n| {
         let id = BenchmarkId::new("NTT-Based", 1 << n);
-        let N = BigInt::from((2 * n).next_power_of_two());
+        let N = BigInt::from_usize((2 * n).next_power_of_two());
         let M = N << 1 + 1;
         let c = working_modulus(N, M);
         group.bench_with_input(id, &n, |b, n| {

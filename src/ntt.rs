@@ -11,9 +11,9 @@ pub struct Constants<T: PolynomialFieldElement> {
 
 fn prime_factors<T: PolynomialFieldElement>(a: T) -> Vec<T> {
     let mut ans: Vec<T> = Vec::new();
-    let ZERO = T::from(0);
-    let ONE = T::from(1);
-    let mut x = T::from(2);
+    let ZERO = T::from_i32(0, BigInt::modulus());
+    let ONE = T::from_i32(1, BigInt::modulus());
+    let mut x = T::from_u32(2, BigInt::modulus());
     while x * x <= a {
         if a.rem(x) == ZERO {
             ans.push(x);
@@ -26,7 +26,7 @@ fn prime_factors<T: PolynomialFieldElement>(a: T) -> Vec<T> {
 #[cfg(feature = "parallel")]
 fn is_primitive_root<T: PolynomialFieldElement>(a: T, deg: T, N: T) -> bool {
     let lhs = a.mod_exp(deg, N);
-    let ONE = T::from(1);
+    let ONE = T::from_i32(1);
     let lhs = lhs == ONE;
     let rhs = prime_factors(deg)
         .par_iter()
@@ -38,7 +38,7 @@ fn is_primitive_root<T: PolynomialFieldElement>(a: T, deg: T, N: T) -> bool {
 #[cfg(not(feature = "parallel"))]
 fn is_primitive_root<T: PolynomialFieldElement>(a: T, deg: T, N: T) -> bool {
     let lhs = a.mod_exp(deg, N);
-    let ONE = T::from(1);
+    let ONE = T::from_u32(1, BigInt::modulus());
     let lhs = lhs == ONE;
     let rhs = prime_factors(deg)
         .iter()
@@ -48,8 +48,8 @@ fn is_primitive_root<T: PolynomialFieldElement>(a: T, deg: T, N: T) -> bool {
 }
 
 pub fn working_modulus<T: PolynomialFieldElement>(n: T, M: T) -> Constants<T> {
-    let ZERO = T::from(0);
-    let ONE = T::from(1);
+    let ZERO = T::from_u32(0, BigInt::modulus());
+    let ONE = T::from_u32(1, BigInt::modulus());
     let mut N = M;
     if N >= ONE {
         N = N * n + ONE;
@@ -59,8 +59,8 @@ pub fn working_modulus<T: PolynomialFieldElement>(n: T, M: T) -> Constants<T> {
     }
     let totient = N - ONE;
     assert!(N >= M);
-    let mut gen = T::from(0);
-    let mut g = T::from(2);
+    let mut gen = T::from_u32(0, BigInt::modulus());
+    let mut g = T::from_u32(2, BigInt::modulus());
     while g < N {
         if is_primitive_root(g, totient, N) {
             gen = g;
@@ -96,14 +96,14 @@ fn fft<T: PolynomialFieldElement>(inp: Vec<T>, c: &Constants<T>, w: T) -> Vec<T>
     let mut inp = inp.clone();
     let N = inp.len();
     let MOD = T::from(c.N);
-    let ONE = T::from(1);
+    let ONE = T::from_u32(1, BigInt::modulus());
     let mut pre: Vec<T> = vec![ONE; N / 2];
     let CHUNK_COUNT = 128;
-    let chunk_count = T::from(CHUNK_COUNT);
+    let chunk_count = T::from_usize(CHUNK_COUNT);
 
     pre.par_chunks_mut(CHUNK_COUNT)
         .enumerate()
-        .for_each(|(i, arr)| arr[0] = w.mod_exp(T::from(i) * chunk_count, MOD));
+        .for_each(|(i, arr)| arr[0] = w.mod_exp(T::from_usize(i) * chunk_count, MOD));
     pre.par_chunks_mut(CHUNK_COUNT).for_each(|x| {
         (1..x.len()).for_each(|y| {
             let _x = x.to_vec();
@@ -147,14 +147,16 @@ fn fft<T: PolynomialFieldElement>(inp: Vec<T>, c: &Constants<T>, w: T) -> Vec<T>
     let mut inp = inp.clone();
     let N = inp.len();
     let MOD = T::from(c.N);
-    let ONE = T::from(1);
+    let ONE = T::from_i32(1, BigInt::modulus());
     let mut pre: Vec<T> = vec![ONE; N / 2];
     let CHUNK_COUNT = 128;
-    let chunk_count = T::from(CHUNK_COUNT);
+    let chunk_count = T::from_usize(CHUNK_COUNT, BigInt::modulus());
 
     pre.chunks_mut(CHUNK_COUNT)
         .enumerate()
-        .for_each(|(i, arr)| arr[0] = w.mod_exp(T::from(i) * chunk_count, MOD));
+        .for_each(|(i, arr)| {
+            arr[0] = w.mod_exp(T::from_usize(i, BigInt::modulus()) * chunk_count, MOD)
+        });
     pre.chunks_mut(CHUNK_COUNT).for_each(|x| {
         (1..x.len()).for_each(|y| {
             let _x = x.to_vec();
@@ -198,7 +200,7 @@ pub fn forward<T: PolynomialFieldElement>(inp: Vec<T>, c: &Constants<T>) -> Vec<
 
 #[cfg(feature = "parallel")]
 pub fn inverse<T: PolynomialFieldElement>(inp: Vec<T>, c: &Constants<T>) -> Vec<T> {
-    let mut inv = T::from(inp.len());
+    let mut inv = T::from_usize(inp.len());
     let _ = inv.set_mod(c.N);
     let inv = inv.invert();
     let w = c.w.invert();
@@ -209,7 +211,7 @@ pub fn inverse<T: PolynomialFieldElement>(inp: Vec<T>, c: &Constants<T>) -> Vec<
 
 #[cfg(not(feature = "parallel"))]
 pub fn inverse<T: PolynomialFieldElement>(inp: Vec<T>, c: &Constants<T>) -> Vec<T> {
-    let mut inv = T::from(inp.len());
+    let mut inv = T::from_usize(inp.len(), BigInt::modulus());
     let _ = inv.set_mod(c.N);
     let inv = inv.invert();
     let w = c.w.invert();
@@ -236,9 +238,9 @@ mod tests {
         //     .collect();
         // let M = (*v.iter().max().unwrap() << 1) * BigInt::from(n) + 1;
         let n = 8;
-        let v: Vec<BigInt> = (0..n).map(|x| BigInt::from(x)).collect();
-        let M = BigInt::from(n) * BigInt::from(n) + 1;
-        let c = working_modulus(BigInt::from(n), BigInt::from(M));
+        let v: Vec<BigInt> = (0..n).map(|x| BigInt::from_i32(x)).collect();
+        let M = BigInt::from_i32(n) * BigInt::from_i32(n) + BigInt::from_i32(0);
+        let c = working_modulus(BigInt::from_i32(n), M);
         let forward = forward(v.clone(), &c);
         let inverse = inverse(forward, &c);
         v.iter().zip(inverse).for_each(|(&a, b)| assert_eq!(a, b));
@@ -247,18 +249,19 @@ mod tests {
     #[test]
     fn test_roots_of_unity() {
         let N = 10;
-        let ONE = BigInt::from(1);
+        let ONE = BigInt::from_i32(1);
         let mut pre: Vec<BigInt> = vec![ONE; N / 2];
         let mut pre2 = pre.clone();
         let CHUNK_COUNT = 128;
-        let MOD = BigInt::from(10);
-        let chunk_count = BigInt::from(CHUNK_COUNT);
-        let w = BigInt::from(2);
+        let MOD = BigInt::from_i32(10);
+        let chunk_count = BigInt::from_usize(CHUNK_COUNT);
+        let w = BigInt::from_i32(2);
 
         (1..N / 2).for_each(|i| pre[i] = (pre[i - 1] * w).rem(MOD));
 
-        (1..N / (2 * CHUNK_COUNT))
-            .for_each(|i| pre2[i * CHUNK_COUNT] = w.mod_exp(BigInt::from(i) * chunk_count, MOD));
+        (1..N / (2 * CHUNK_COUNT)).for_each(|i| {
+            pre2[i * CHUNK_COUNT] = w.mod_exp(BigInt::from_usize(i) * chunk_count, MOD)
+        });
         pre2.par_chunks_mut(CHUNK_COUNT).for_each(|x| {
             (1..x.len()).for_each(|y| {
                 let _x = x.to_vec();

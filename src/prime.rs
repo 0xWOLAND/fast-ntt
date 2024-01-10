@@ -1,8 +1,8 @@
 use crate::{numbers::BigInt, polynomial::PolynomialFieldElement};
 
 fn miller_test<T: PolynomialFieldElement>(mut d: T, n: T, x: T) -> bool {
-    let ONE = T::from(1);
-    let TWO = T::from(2);
+    let ONE = T::from_i32(1, BigInt::modulus());
+    let TWO = T::from_i32(2, BigInt::modulus());
     let a = TWO + x;
 
     let mut x = a.mod_exp(d, n);
@@ -37,11 +37,11 @@ fn miller_test<T: PolynomialFieldElement>(mut d: T, n: T, x: T) -> bool {
 }
 
 pub fn is_prime<T: PolynomialFieldElement>(num: T) -> bool {
-    let ONE = T::from(1);
-    if num <= ONE || num == T::from(4) {
+    let ONE = T::from_i32(1, BigInt::modulus());
+    if num <= ONE || num == T::from_i32(4, BigInt::modulus()) {
         return false;
     }
-    if num <= T::from(3) {
+    if num <= T::from_i32(3, BigInt::modulus()) {
         return true;
     }
 
@@ -51,7 +51,7 @@ pub fn is_prime<T: PolynomialFieldElement>(num: T) -> bool {
     }
 
     for x in 0..4 {
-        if miller_test(d, num, T::from(x)) == false {
+        if miller_test(d, num, T::from_i32(x, BigInt::modulus())) == false {
             return false;
         }
     }
@@ -63,7 +63,7 @@ mod tests {
 
     #[test]
     fn test_is_prime() {
-        assert!(is_prime(BigInt::from(11)));
-        assert!(!is_prime(BigInt::from(10)));
+        assert!(is_prime(BigInt::from_i32(11)));
+        assert!(!is_prime(BigInt::from_i32(10)));
     }
 }

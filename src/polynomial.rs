@@ -1,3 +1,4 @@
+use crypto_bigint::modular::runtime_mod::DynResidueParams;
 use rayon::iter::{
     IndexedParallelIterator, IntoParallelRefIterator, IntoParallelRefMutIterator, ParallelIterator,
 };
@@ -11,17 +12,12 @@ use std::{
 use crypto_bigint::Invert;
 use itertools::{EitherOrBoth::*, Itertools};
 
+use crate::numbers::{BigInt, LIMBS};
 use crate::{ntt::*, numbers::NttFieldElement};
 
 pub trait PolynomialFieldElement:
     NttFieldElement
     + Display
-    + From<u16>
-    + From<u32>
-    + From<i32>
-    // + From<u64>
-    // + From<u128>
-    + From<usize>
     + Clone
     + Copy
     + Add<Output = Self>
@@ -38,6 +34,10 @@ pub trait PolynomialFieldElement:
     + Send
     + Sync
 {
+    fn from_u16(v: u16, p: DynResidueParams<LIMBS>) -> Self;
+    fn from_u32(v: u32, p: DynResidueParams<LIMBS>) -> Self;
+    fn from_i32(v: i32, p: DynResidueParams<LIMBS>) -> Self;
+    fn from_usize(v: usize, p: DynResidueParams<LIMBS>) -> Self;
 }
 
 pub trait PolynomialTrait<T: PolynomialFieldElement> {
@@ -60,7 +60,7 @@ impl<T: PolynomialFieldElement> PolynomialTrait<T> for Polynomial<T> {
     }
 
     fn degree(&self) -> usize {
-        let ZERO = T::from(0);
+        let ZERO = T::from_u32(0, BigInt::modulus());
         let start = self.coef.iter().position(|&x| x != ZERO).unwrap();
         self.len() - start - 1
     }
@@ -102,7 +102,7 @@ pub fn mul_brute<T: PolynomialFieldElement>(
 ) -> Polynomial<T> {
     let a = lhs.len();
     let b = rhs.len();
-    let ZERO = T::from(0_u32);
+    let ZERO = T::from_u32(0, BigInt::modulus());
 
     let mut out: Vec<T> = vec![ZERO; a + b];
 
@@ -161,7 +161,7 @@ pub fn fast_mul<T: PolynomialFieldElement, P: PolynomialTrait<T>>(
     let v1_deg = lhs.degree();
     let v2_deg = rhs.degree();
     let n = (lhs.len() + rhs.len()).next_power_of_two();
-    let ZERO = T::from(0_u32);
+    let ZERO = T::from_u32(0, BigInt::modulus());
 
     let v1: Vec<T> = vec![ZERO; n - lhs.len()]
         .into_iter()
@@ -193,9 +193,9 @@ pub fn diff<T: PolynomialFieldElement, P: PolynomialTrait<T>>(mut poly: P) -> P 
     let N = poly.len();
     let _poly = poly.to_vec();
     for n in (1..N).rev() {
-        poly.set_coef(_poly[n - 1] * T::from(N - n), n);
+        poly.set_coef(_poly[n - 1] * T::from_usize(N - n, BigInt::modulus()), n);
     }
-    let ZERO = T::from(0);
+    let ZERO = T::from_usize(0, BigInt::modulus());
     poly.set_coef(ZERO, 0);
     let mut _poly = poly.to_vec();
     let start = _poly.iter().position(|&x| x != ZERO).unwrap();
@@ -265,32 +265,37 @@ mod tests {
     use super::Polynomial;
     use crate::{
         ntt::{working_modulus, Constants},
-        numbers::BigInt,
+        numbers::{BigInt, NttFieldElement},
         polynomial::{diff, fast_mul, PolynomialTrait},
     };
 
     #[test]
     fn test_add() {
-        let a = Polynomial::new(vec![1, 2, 3, 4].iter().map(|&x| BigInt::from(x)).collect());
-        let b = Polynomial::new(vec![1, 2].iter().map(|&x| BigInt::from(x)).collect());
+        let a = Polynomial::new(
+            vec![1, 2, 3, 4]
+                .iter()
+                .map(|&x| BigInt::from_i32(x))
+                .collect(),
+        );
+        let b = Polynomial::new(vec![1, 2].iter().map(|&x| BigInt::from_i32(x)).collect());
         println!("{}", a + b);
     }
 
     #[test]
     fn test_mul() {
-        let ONE = BigInt::from(1);
+        let ONE = BigInt::from_u32(1);
         (0..10).for_each(|_| {
             let n: usize = 1 << rand::thread_rng().gen::<usize>() % (1 << 3);
             let v1: Vec<BigInt> = (0..n)
-                .map(|_| BigInt::from(rand::thread_rng().gen::<u32>() % (1 << 6)))
+                .map(|_| BigInt::from_u32(rand::thread_rng().gen::<u32>() % (1 << 6)))
                 .collect();
             let v2: Vec<BigInt> = (0..n)
-                .map(|_| BigInt::from(rand::thread_rng().gen::<u32>() % (1 << 6)))
+                .map(|_| BigInt::from_u32(rand::thread_rng().gen::<u32>() % (1 << 6)))
                 .collect();
             let a = Polynomial::new(vec![ONE].into_iter().chain(v1.into_iter()).collect_vec());
             let b = Polynomial::new(vec![ONE].into_iter().chain(v2.into_iter()).collect_vec());
 
-            let N = BigInt::from((a.len() + b.len()).next_power_of_two());
+            let N = BigInt::from_usize((a.len() + b.len()).next_power_of_two());
             let M = (*a
                 .coef
                 .iter()
@@ -309,15 +314,15 @@ mod tests {
 
     #[test]
     fn test_diff() {
-        let a = Polynomial::new(vec![3, 2, 1].iter().map(|&x| BigInt::from(x)).collect());
+        let a = Polynomial::new(vec![3, 2, 1].iter().map(|&x| BigInt::from_i32(x)).collect());
         let da = diff(a);
         println!("{}", da);
     }
 
     #[test]
     fn test_comparator() {
-        let a = BigInt::from(550338105);
-        let b = BigInt::from(1);
+        let a = BigInt::from_u32(550338105);
+        let b = BigInt::from_u32(1);
         assert!(a > b);
         let p = Polynomial::new(vec![a, b]);
         let hi = p.max();
