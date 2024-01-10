@@ -23,8 +23,8 @@ use crate::polynomial::PolynomialFieldElement;
 pub enum BigIntType {
     U16(u16),
     U32(u32),
-    U64(u64),
-    U128(u128),
+    // U64(u64),
+    // U128(u128),
 }
 
 pub trait NttFieldElement {
@@ -52,8 +52,8 @@ impl BigInt {
             v: match _v {
                 BigIntType::U16(x) => DynResidue::new(&U256::from(x), params),
                 BigIntType::U32(x) => DynResidue::new(&U256::from(x), params),
-                BigIntType::U64(x) => DynResidue::new(&U256::from(x), params),
-                BigIntType::U128(x) => DynResidue::new(&U256::from(x), params),
+                // BigIntType::U64(x) => DynResidue::new(&U256::from(x), params),
+                // BigIntType::U128(x) => DynResidue::new(&U256::from(x), params),
                 _ => panic!("received invalid `BigIntType`"),
             },
         }
@@ -121,8 +121,8 @@ impl BigInt {
     }
 
     pub fn random() -> BigInt {
-        let x = rand::thread_rng().gen::<u128>();
-        BigInt::new(BigIntType::U128(x))
+        let x = rand::thread_rng().gen::<u32>();
+        BigInt::new(BigIntType::U32(x))
     }
 
     pub fn is_zero(&self) -> bool {
@@ -225,7 +225,7 @@ impl From<i32> for BigInt {
 
 impl From<usize> for BigInt {
     fn from(value: usize) -> Self {
-        BigInt::new(BigIntType::U64(value as u64))
+        BigInt::new(BigIntType::U32(value as u32))
     }
 }
 
@@ -235,17 +235,17 @@ impl From<u32> for BigInt {
     }
 }
 
-impl From<u64> for BigInt {
-    fn from(value: u64) -> Self {
-        BigInt::new(BigIntType::U64(value))
-    }
-}
+// impl From<u64> for BigInt {
+//     fn from(value: u64) -> Self {
+//         BigInt::new(BigIntType::U64(value))
+//     }
+// }
 
-impl From<u128> for BigInt {
-    fn from(value: u128) -> Self {
-        BigInt::new(BigIntType::U128(value))
-    }
-}
+// impl From<u128> for BigInt {
+//     fn from(value: u128) -> Self {
+//         BigInt::new(BigIntType::U128(value))
+//     }
+// }
 
 impl Add for BigInt {
     type Output = BigInt;
@@ -290,25 +290,25 @@ impl Add<u32> for BigInt {
     }
 }
 
-impl Add<u64> for BigInt {
-    type Output = BigInt;
+// impl Add<u64> for BigInt {
+//     type Output = BigInt;
 
-    fn add(self, rhs: u64) -> Self::Output {
-        Self {
-            v: self.v + BigInt::from(rhs).v,
-        }
-    }
-}
+//     fn add(self, rhs: u64) -> Self::Output {
+//         Self {
+//             v: self.v + BigInt::from(rhs).v,
+//         }
+//     }
+// }
 
-impl Add<u128> for BigInt {
-    type Output = BigInt;
+// impl Add<u128> for BigInt {
+//     type Output = BigInt;
 
-    fn add(self, rhs: u128) -> Self::Output {
-        Self {
-            v: self.v + BigInt::from(rhs).v,
-        }
-    }
-}
+//     fn add(self, rhs: u128) -> Self::Output {
+//         Self {
+//             v: self.v + BigInt::from(rhs).v,
+//         }
+//     }
+// }
 
 impl AddAssign for BigInt {
     fn add_assign(&mut self, rhs: Self) {
@@ -334,17 +334,17 @@ impl AddAssign<i32> for BigInt {
     }
 }
 
-impl AddAssign<u64> for BigInt {
-    fn add_assign(&mut self, rhs: u64) {
-        *self = *self + BigInt::from(rhs);
-    }
-}
+// impl AddAssign<u64> for BigInt {
+//     fn add_assign(&mut self, rhs: u64) {
+//         *self = *self + BigInt::from(rhs);
+//     }
+// }
 
-impl AddAssign<u128> for BigInt {
-    fn add_assign(&mut self, rhs: u128) {
-        *self = *self + BigInt::from(rhs);
-    }
-}
+// impl AddAssign<u128> for BigInt {
+//     fn add_assign(&mut self, rhs: u128) {
+//         *self = *self + BigInt::from(rhs);
+//     }
+// }
 
 impl Sub for BigInt {
     type Output = BigInt;
@@ -391,21 +391,21 @@ impl Sub<i32> for BigInt {
     }
 }
 
-impl Sub<u64> for BigInt {
-    type Output = BigInt;
+// impl Sub<u64> for BigInt {
+//     type Output = BigInt;
 
-    fn sub(self, rhs: u64) -> Self::Output {
-        self - BigInt::from(rhs)
-    }
-}
+//     fn sub(self, rhs: u64) -> Self::Output {
+//         self - BigInt::from(rhs)
+//     }
+// }
 
-impl Sub<u128> for BigInt {
-    type Output = BigInt;
+// impl Sub<u128> for BigInt {
+//     type Output = BigInt;
 
-    fn sub(self, rhs: u128) -> Self::Output {
-        self - BigInt::from(rhs)
-    }
-}
+//     fn sub(self, rhs: u128) -> Self::Output {
+//         self - BigInt::from(rhs)
+//     }
+// }
 
 impl SubAssign for BigInt {
     fn sub_assign(&mut self, rhs: Self) {
@@ -431,17 +431,17 @@ impl SubAssign<i32> for BigInt {
     }
 }
 
-impl SubAssign<u64> for BigInt {
-    fn sub_assign(&mut self, rhs: u64) {
-        *self = *self - BigInt::from(rhs);
-    }
-}
+// impl SubAssign<u64> for BigInt {
+//     fn sub_assign(&mut self, rhs: u64) {
+//         *self = *self - BigInt::from(rhs);
+//     }
+// }
 
-impl SubAssign<u128> for BigInt {
-    fn sub_assign(&mut self, rhs: u128) {
-        *self = *self - BigInt::from(rhs);
-    }
-}
+// impl SubAssign<u128> for BigInt {
+//     fn sub_assign(&mut self, rhs: u128) {
+//         *self = *self - BigInt::from(rhs);
+//     }
+// }
 
 impl Neg for BigInt {
     type Output = BigInt;
@@ -539,17 +539,17 @@ impl PartialEq<u32> for BigInt {
     }
 }
 
-impl PartialEq<u64> for BigInt {
-    fn eq(&self, other: &u64) -> bool {
-        self.v.retrieve() == BigInt::from(*other).v.retrieve()
-    }
-}
+// impl PartialEq<u64> for BigInt {
+//     fn eq(&self, other: &u64) -> bool {
+//         self.v.retrieve() == BigInt::from(*other).v.retrieve()
+//     }
+// }
 
-impl PartialEq<u128> for BigInt {
-    fn eq(&self, other: &u128) -> bool {
-        self.v.retrieve() == BigInt::from(*other).v.retrieve()
-    }
-}
+// impl PartialEq<u128> for BigInt {
+//     fn eq(&self, other: &u128) -> bool {
+//         self.v.retrieve() == BigInt::from(*other).v.retrieve()
+//     }
+// }
 
 impl PartialOrd for BigInt {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
@@ -575,17 +575,17 @@ impl PartialOrd<u32> for BigInt {
     }
 }
 
-impl PartialOrd<u64> for BigInt {
-    fn partial_cmp(&self, other: &u64) -> Option<std::cmp::Ordering> {
-        (self.v.retrieve()).partial_cmp(&BigInt::from(*other).v.retrieve())
-    }
-}
+// impl PartialOrd<u64> for BigInt {
+//     fn partial_cmp(&self, other: &u64) -> Option<std::cmp::Ordering> {
+//         (self.v.retrieve()).partial_cmp(&BigInt::from(*other).v.retrieve())
+//     }
+// }
 
-impl PartialOrd<u128> for BigInt {
-    fn partial_cmp(&self, other: &u128) -> Option<std::cmp::Ordering> {
-        (self.v.retrieve()).partial_cmp(&BigInt::from(*other).v.retrieve())
-    }
-}
+// impl PartialOrd<u128> for BigInt {
+//     fn partial_cmp(&self, other: &u128) -> Option<std::cmp::Ordering> {
+//         (self.v.retrieve()).partial_cmp(&BigInt::from(*other).v.retrieve())
+//     }
+// }
 
 impl BitAnd for BigInt {
     type Output = BigInt;
@@ -636,31 +636,31 @@ impl BitAnd<u32> for BigInt {
     }
 }
 
-impl BitAnd<u64> for BigInt {
-    type Output = BigInt;
+// impl BitAnd<u64> for BigInt {
+//     type Output = BigInt;
 
-    fn bitand(self, rhs: u64) -> Self::Output {
-        BigInt {
-            v: DynResidue::new(
-                &(self.v.retrieve() & BigInt::from(rhs).v.retrieve()),
-                self.params(),
-            ),
-        }
-    }
-}
+//     fn bitand(self, rhs: u64) -> Self::Output {
+//         BigInt {
+//             v: DynResidue::new(
+//                 &(self.v.retrieve() & BigInt::from(rhs).v.retrieve()),
+//                 self.params(),
+//             ),
+//         }
+//     }
+// }
 
-impl BitAnd<u128> for BigInt {
-    type Output = BigInt;
+// impl BitAnd<u128> for BigInt {
+//     type Output = BigInt;
 
-    fn bitand(self, rhs: u128) -> Self::Output {
-        BigInt {
-            v: DynResidue::new(
-                &(self.v.retrieve() & BigInt::from(rhs).v.retrieve()),
-                self.params(),
-            ),
-        }
-    }
-}
+//     fn bitand(self, rhs: u128) -> Self::Output {
+//         BigInt {
+//             v: DynResidue::new(
+//                 &(self.v.retrieve() & BigInt::from(rhs).v.retrieve()),
+//                 self.params(),
+//             ),
+//         }
+//     }
+// }
 
 impl BitOr for BigInt {
     type Output = BigInt;
@@ -711,31 +711,31 @@ impl BitOr<u32> for BigInt {
     }
 }
 
-impl BitOr<u64> for BigInt {
-    type Output = BigInt;
+// impl BitOr<u64> for BigInt {
+//     type Output = BigInt;
 
-    fn bitor(self, rhs: u64) -> Self::Output {
-        BigInt {
-            v: DynResidue::new(
-                &(self.v.retrieve() | BigInt::from(rhs).v.retrieve()),
-                self.params(),
-            ),
-        }
-    }
-}
+//     fn bitor(self, rhs: u64) -> Self::Output {
+//         BigInt {
+//             v: DynResidue::new(
+//                 &(self.v.retrieve() | BigInt::from(rhs).v.retrieve()),
+//                 self.params(),
+//             ),
+//         }
+//     }
+// }
 
-impl BitOr<u128> for BigInt {
-    type Output = BigInt;
+// impl BitOr<u128> for BigInt {
+//     type Output = BigInt;
 
-    fn bitor(self, rhs: u128) -> Self::Output {
-        BigInt {
-            v: DynResidue::new(
-                &(self.v.retrieve() | BigInt::from(rhs).v.retrieve()),
-                self.params(),
-            ),
-        }
-    }
-}
+//     fn bitor(self, rhs: u128) -> Self::Output {
+//         BigInt {
+//             v: DynResidue::new(
+//                 &(self.v.retrieve() | BigInt::from(rhs).v.retrieve()),
+//                 self.params(),
+//             ),
+//         }
+//     }
+// }
 
 impl Shl<usize> for BigInt {
     type Output = BigInt;

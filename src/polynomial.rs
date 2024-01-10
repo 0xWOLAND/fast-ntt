@@ -19,8 +19,8 @@ pub trait PolynomialFieldElement:
     + From<u16>
     + From<u32>
     + From<i32>
-    + From<u64>
-    + From<u128>
+    // + From<u64>
+    // + From<u128>
     + From<usize>
     + Clone
     + Copy
