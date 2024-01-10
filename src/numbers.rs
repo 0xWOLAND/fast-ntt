@@ -1,5 +1,4 @@
 use std::{
-    cmp::Ordering,
     fmt::Display,
     num::NonZeroU128,
     ops::{
@@ -9,14 +8,11 @@ use std::{
 };
 
 use crypto_bigint::{
-    modular::{
-        runtime_mod::{DynResidue, DynResidueParams},
-        Retrieve,
-    },
-    Invert, NonZero, Uint, U128, U256,
+    modular::runtime_mod::{DynResidue, DynResidueParams},
+    Invert, NonZero, Uint, U128,
 };
 use itertools::Itertools;
-use rand::{thread_rng, Error, Rng};
+use rand::Rng;
 
 use crate::polynomial::PolynomialFieldElement;
 
@@ -26,6 +22,19 @@ pub enum BigIntType {
     // U64(u64),
     // U128(u128),
 }
+
+pub const P_BITS: usize = 128;
+
+#[cfg(target_pointer_width = "16")]
+const POINTER_WIDTH: usize = 16;
+
+#[cfg(target_pointer_width = "32")]
+const POINTER_WIDTH: usize = 32;
+
+#[cfg(target_pointer_width = "64")]
+const POINTER_WIDTH: usize = 64;
+
+pub const LIMBS: usize = P_BITS / POINTER_WIDTH;
 
 pub trait NttFieldElement {
     // all operations should be under the modular group `M`
@@ -40,20 +49,20 @@ pub trait NttFieldElement {
 
 #[derive(Debug, Clone, Copy)]
 pub struct BigInt {
-    pub v: DynResidue<4>,
+    pub v: DynResidue<LIMBS>,
 }
 
 impl BigInt {
     pub fn new(_v: BigIntType) -> Self {
-        let params = DynResidueParams::new(&U256::from_be_hex(
+        let params = DynResidueParams::new(&U128::from_be_hex(
             "ffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551",
         ));
         Self {
             v: match _v {
-                BigIntType::U16(x) => DynResidue::new(&U256::from(x), params),
-                BigIntType::U32(x) => DynResidue::new(&U256::from(x), params),
-                // BigIntType::U64(x) => DynResidue::new(&U256::from(x), params),
-                // BigIntType::U128(x) => DynResidue::new(&U256::from(x), params),
+                BigIntType::U16(x) => DynResidue::new(&U128::from(x), params),
+                BigIntType::U32(x) => DynResidue::new(&U128::from(x), params),
+                // BigIntType::U64(x) => DynResidue::new(&U128::from(x), params),
+                // BigIntType::U128(x) => DynResidue::new(&U128::from(x), params),
                 _ => panic!("received invalid `BigIntType`"),
             },
         }
@@ -63,12 +72,12 @@ impl BigInt {
         if M.is_even() {
             return Err("modulus must be odd".to_string());
         }
-        let params = DynResidueParams::new(&(U256::from(M.v.retrieve())));
+        let params = DynResidueParams::new(&(U128::from(M.v.retrieve())));
         self.v = DynResidue::new(&self.v.retrieve(), params);
         Ok(())
     }
 
-    pub fn set_mod_from_residue(&mut self, params: DynResidueParams<4>) {
+    pub fn set_mod_from_residue(&mut self, params: DynResidueParams<LIMBS>) {
         self.v = DynResidue::new(&self.v.retrieve(), params);
     }
 
@@ -84,13 +93,13 @@ impl BigInt {
         res
     }
 
-    pub fn params(&self) -> DynResidueParams<4> {
+    pub fn params(&self) -> DynResidueParams<LIMBS> {
         *self.v.params()
     }
 
     pub fn pow(&self, n: u128) -> BigInt {
         BigInt {
-            v: self.v.pow(&Uint::<4>::from_u128(n)),
+            v: self.v.pow(&Uint::<LIMBS>::from_u128(n)),
         }
     }
 
@@ -148,7 +157,7 @@ impl NttFieldElement for BigInt {
         if M.is_even() {
             return Err("modulus must be odd".to_string());
         }
-        let params = DynResidueParams::new(&(U256::from(M.v.retrieve())));
+        let params = DynResidueParams::new(&(U128::from(M.v.retrieve())));
         self.v = DynResidue::new(&self.v.retrieve(), params);
         Ok(())
     }
@@ -167,7 +176,7 @@ impl NttFieldElement for BigInt {
 
     fn pow(&self, n: u128) -> BigInt {
         BigInt {
-            v: self.v.pow(&Uint::<4>::from_u128(n)),
+            v: self.v.pow(&Uint::<LIMBS>::from_u128(n)),
         }
     }
 
